@@ -9,7 +9,6 @@ class Car:
         self.id = id
         self.priority = priority
         self.map = None
-        self.detected = False
 
 class Region:
 
@@ -221,13 +220,6 @@ class Mission:
         for cell in self.cells:
             if cellInAnyKeepOutZone(cell, self.keep_out_zones):
                 cell.in_keep_out_zone = True
-
-
-    def allCarsAreDetected(self):
-        for car in self.car_list:
-            if not car.detected:
-                return False
-        return True
 
 
     def getSpecialAOIPoints(self):
