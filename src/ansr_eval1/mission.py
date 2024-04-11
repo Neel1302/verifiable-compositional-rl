@@ -136,13 +136,11 @@ class Mission:
 
         for area in self.description_data["scenario_objective"]["areas_of_interest"]:
             for polygon in area["polygon_vertices"]:
-                print(polygon)
                 enu_points = []
                 for point in polygon:
                     enu_point = point[::-1]
                     enu_points.append(enu_point)
                 poly = Polygon(enu_points)
-                print(poly)
                 self.AOI_list.append(poly)
 
 
@@ -152,15 +150,25 @@ class Mission:
             car = Car(id, priority)
 
             region_list = []
-            for map in entity["entity_priors"]["location_belief_map"]:
-                for polygon in map["polygon_vertices"]:
+            total_prob = 0
+            for area in entity["entity_priors"]["location_belief_map"]:
+                for polygon in area["polygon_vertices"]:
                     enu_points = []
                     for point in polygon:
                         enu_point = point[::-1]
                         enu_points.append(enu_point)
                     poly = Polygon(enu_points)
-                    prob = map["probability"]
+                    prob = area["probability"]
+                    total_prob = total_prob + prob
                     region = Region(prob, poly)
+                    region_list.append(region)
+            # AOI
+            if total_prob < 1:
+                for AOI in self.AOI_list:
+                    diff = AOI
+                    for region in region_list:
+                        diff = diff - region.polygon
+                    region = Region(1-total_prob, diff)
                     region_list.append(region)
 
             region_list.sort(reverse=True, key=polygonSortCriterion)
@@ -204,7 +212,6 @@ class Mission:
             route = Route(points_list, rectangles)
             self.route_list.append(route)
 
-
         # Postprocessing
         for car in self.car_list:
             for region in car.map:
@@ -215,11 +222,13 @@ class Mission:
             if cellInAnyKeepOutZone(cell, self.keep_out_zones):
                 cell.in_keep_out_zone = True
 
+
     def allCarsAreDetected(self):
         for car in self.car_list:
             if not car.detected:
                 return False
         return True
+
 
     def getSpecialAOIPoints(self):
         points = ([64, 64], [-64, -64], [64, -64])
@@ -233,6 +242,7 @@ class Mission:
                         if point not in AOI_points:
                             AOI_points.append(point)
         return AOI_points
+
 
     def getSpecialAOIPointEntry(self, AOI_point):
         x = AOI_point[0]
@@ -260,13 +270,15 @@ class Mission:
                     return [x1, y1]
         return [1e5, 1e5]
 
+
 if __name__ == "__main__":
         #mission = Mission('../../../mission-schema/examples/Maneuver/RouteSearch/RSM002/description.json', '../../../mission-schema/examples/Maneuver/RouteSearch/RSM002/config.json') 
         mission = Mission('../../../mission-schema/examples/Maneuver/AreaSearch/ASM004/description.json', '../../../mission-schema/examples/Maneuver/AreaSearch/ASM004/config.json') 
 
         for area in mission.AOI_list:
+            print('AOI ', area)
             x,y = area.exterior.xy
-            plt.plot(x,y)
+            #plt.plot(x,y)
 
         for car in mission.car_list:
             print(car.id)
@@ -276,18 +288,18 @@ if __name__ == "__main__":
                 print(region.polygon)
                 print('cells: ', region.cells)
                 x,y = region.polygon.exterior.xy
-                plt.plot(x,y)
+                #plt.plot(x,y)
 
         for zone in mission.keep_out_zones:
             print("t_start ", zone.t_start)
             print("t_end ", zone.t_end)
             x,y = zone.polygon.exterior.xy
-            plt.plot(x,y)
+            #plt.plot(x,y)
 
         for cell in mission.cells:
             print(cell.in_keep_out_zone)
             x,y = cell.polygon.exterior.xy
-            #plt.plot(x,y)
+            plt.plot(x,y)
 
         for route in mission.route_list:
             for points in route.points_list:
