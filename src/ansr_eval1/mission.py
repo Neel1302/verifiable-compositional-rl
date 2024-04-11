@@ -183,11 +183,15 @@ if __name__ == "__main__":
         for cell in mission.cells:
             print(cell.in_keep_out_zone)
             x,y = cell.polygon.exterior.xy
-            plt.plot(x,y)
+            # plt.plot(x,y)
 
         for route in mission.route_list:
             linestring = LineString(route)
-            #plt.plot(*linestring.xy,  linewidth=7.0)
+            plt.plot(*linestring.xy,  linewidth=7.0)
+
+        for rect in mission.rect_list:
+                x,y = rect.exterior.xy
+                plt.plot(x,y)
 
         plt.show()
 

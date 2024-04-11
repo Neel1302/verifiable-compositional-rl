@@ -78,8 +78,11 @@ class MinimalPublisher(Node):
         # Setup
         self.setup()
         
-        # Start mission
-        self.run_mission()
+        # Start appropriate mission
+        if self.mission.mission_class == "Area Search":
+            self.run_area_search_mission()
+        elif self.mission.mission_class == "Route Search":
+            self.run_area_search_mission() # Change to route search function
 
     def gt_perception_callback(self, gt_perception_msg):
         entity_status = "entered" if gt_perception_msg.enter_or_leave == 0 else "left"
@@ -145,10 +148,13 @@ class MinimalPublisher(Node):
             if os.path.isdir(controller_load_path):
                 controller = MiniGridController(0, load_dir=controller_load_path)
                 self.controller_list.append(controller)
+
+        # Get a unique set of entry conditions for all controllers here -for Junaid's code
+        # instantiate Junaid's code - supply controller_list as an input
         
         self.obs = self.env.reset() # Get the first minigrid state
 
-    def dummy_hl_controller(self, cell_idx):
+    def dummy_hl_controller(self, cell_idx): # add input start intersection (entry or exit condition)
         controller_list = []
         if cell_idx == 0:
             controller_list.extend([3,1])
@@ -172,7 +178,7 @@ class MinimalPublisher(Node):
             controller_list.append(29)
         return controller_list
 
-    def run_mission(self):
+    def run_area_search_mission(self):
         # Itereate through each car in the list of cars
         for car in self.mission.car_list:
             print('Looking for car: ', car.id)
