@@ -103,13 +103,33 @@ class MinimalPublisher(Node):
             airsim_state_entry = minigrid2airsim(AOI_point_entry)
             airsim_state_AOI = minigrid2airsim(point)
 
+            #TODO add path from final to entry
             airsim_state_list.append(airsim_state_entry)
             airsim_state_list.append(airsim_state_AOI)
+            state_list = self.look_around(airsim_state_AOI)
+            airsim_state_list.extend(state_list)
             airsim_state_list.append(airsim_state_entry)
 
             self.pub_waypoint(airsim_state_list)
 
 
+    def look_around(self, state):
+        state_list = []
+        delta = 1
+
+        state[0] = state[0] + delta
+        state_list.append(state)
+
+        state[1] = state[1] + delta
+        state_list.append(state)
+
+        state[0] = state[0] - delta
+        state_list.append(state)
+
+        state[1] = state[1] - delta
+        state_list.append(state)
+
+        return state_list
 
     def gt_perception_callback(self, gt_perception_msg):
         entity_status = "entered" if gt_perception_msg.enter_or_leave == 0 else "left"
