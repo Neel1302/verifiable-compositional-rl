@@ -86,6 +86,7 @@ class Mission:
         self.route_list = []
         self.rect_list = []
         self.cells = []
+        self.AOI_list = []
 
         f_description = open(descriptionFile)
         self.description_data = json.load(f_description)
@@ -132,6 +133,18 @@ class Mission:
         self.mission_class = self.description_data["mission_class"]
 
         self.start_airsim_state = self.config_data["controllable_vehicle_start_loc"]
+
+        for area in self.description_data["scenario_objective"]["areas_of_interest"]:
+            for polygon in area["polygon_vertices"]:
+                print(polygon)
+                enu_points = []
+                for point in polygon:
+                    enu_point = point[::-1]
+                    enu_points.append(enu_point)
+                poly = Polygon(enu_points)
+                print(poly)
+                self.AOI_list.append(poly)
+
 
         for entity in self.description_data["scenario_objective"]["entities_of_interest"]:
             id = entity["entity_id"]
@@ -248,7 +261,12 @@ class Mission:
         return [1e5, 1e5]
 
 if __name__ == "__main__":
-        mission = Mission('../../../mission-schema/examples/Maneuver/RouteSearch/RSM002/description.json', '../../../mission-schema/examples/Maneuver/RouteSearch/RSM002/config.json') # change this to near the end Mission('../../../mission_briefing/description.json')
+        #mission = Mission('../../../mission-schema/examples/Maneuver/RouteSearch/RSM002/description.json', '../../../mission-schema/examples/Maneuver/RouteSearch/RSM002/config.json') 
+        mission = Mission('../../../mission-schema/examples/Maneuver/AreaSearch/ASM004/description.json', '../../../mission-schema/examples/Maneuver/AreaSearch/ASM004/config.json') 
+
+        for area in mission.AOI_list:
+            x,y = area.exterior.xy
+            plt.plot(x,y)
 
         for car in mission.car_list:
             print(car.id)
@@ -269,7 +287,7 @@ if __name__ == "__main__":
         for cell in mission.cells:
             print(cell.in_keep_out_zone)
             x,y = cell.polygon.exterior.xy
-            plt.plot(x,y)
+            #plt.plot(x,y)
 
         for route in mission.route_list:
             for points in route.points_list:
@@ -278,7 +296,7 @@ if __name__ == "__main__":
 
             for rect in route.rectangles:
                 x,y = rect.exterior.xy
-                plt.plot(x,y)
+                #plt.plot(x,y)
 
         plt.show()
 
