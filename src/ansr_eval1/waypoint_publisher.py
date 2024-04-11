@@ -81,8 +81,31 @@ class MinimalPublisher(Node):
         # Start appropriate mission
         if self.mission.mission_class == "Area Search":
             self.run_area_search_mission()
+            if not self.all_cars_detected():
+                self.run_special_aoi_search()
+
         elif self.mission.mission_class == "Route Search":
             self.run_area_search_mission() # Change to route search function
+
+    def all_cars_detected(self):
+        for car in self.mission.car_list:
+            if car.id not in self.detected_entity_ids:
+                return False
+        return True
+
+    def run_special_aoi_search(self):
+        AOI_points = self.mission.getSpecialAOIPoints()
+        for point in AOI_points:
+            AOI_point_entry = self.mission.getSpecialAOIPointEntry(point)
+            airsim_state_entry = minigrid2airsim(AOI_point_entry)
+            airsim_state_list.append(airsim_state_entry)
+            airsim_state_AOI = minigrid2airsim(point)
+            airsim_state_list.append(airsim_state_AOI)
+            airsim_state_list.append(airsim_state_entry)
+
+            self.pub_waypoint(airsim_state_list)
+
+
 
     def gt_perception_callback(self, gt_perception_msg):
         entity_status = "entered" if gt_perception_msg.enter_or_leave == 0 else "left"
