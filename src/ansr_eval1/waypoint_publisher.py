@@ -275,7 +275,7 @@ class MinimalPublisher(Node):
         self.pub_waypoint(obs_list)
 
     def run_single_eoi_search(self, car):
-        # Iterate through each region in AOI
+        # Iterate through each region in AOIs
         for region in car.map:
             print('Probability: ',region.probability)
             print('Polygon: ', region.polygon)
