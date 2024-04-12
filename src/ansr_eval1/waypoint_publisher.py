@@ -95,6 +95,7 @@ class MinimalPublisher(Node):
 
     def run_special_aoi_search(self):
         AOI_points = self.mission.getSpecialAOIPoints()
+        current_state = (self.n_airsim, self.e_airsim, 0)
         for point in AOI_points:
             airsim_state_list = []
             AOI_point_entry = self.mission.getSpecialAOIPointEntry(point)
@@ -103,15 +104,26 @@ class MinimalPublisher(Node):
             airsim_state_entry = minigrid2airsim(AOI_point_entry)
             airsim_state_AOI = minigrid2airsim(point)
 
-            #TODO add path from final to entry
-            airsim_state_list.append(airsim_state_entry)
+            state_list = self.get_navigation_state_list(current_state, airsim_state_entry)
+            airsim_state_list.extend(state_list)
+
             airsim_state_list.append(airsim_state_AOI)
+
             state_list = self.look_around(airsim_state_AOI)
             airsim_state_list.extend(state_list)
+
             airsim_state_list.append(airsim_state_entry)
+            current_state = airsim_state_entry
+            
+        self.pub_waypoint(airsim_state_list)
 
-            self.pub_waypoint(airsim_state_list)
+    def get_navigation_state_list(self, source_state, target_state):
+        state_list = []
+        # TODO
+        state_list.append(source_state)
+        state_list.append(target_state)
 
+        return state_list
 
     def look_around(self, state):
         state_list = []
