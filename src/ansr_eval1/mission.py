@@ -2,6 +2,7 @@ import numpy as np
 import json
 import matplotlib.pyplot as plt
 from shapely.geometry import Polygon, Point, LineString
+from graph import Graph
 
 class Car:
 
@@ -124,6 +125,9 @@ class Mission:
         self.cells.append(cell_12)
         self.cells.append(cell_13)
         self.cells.append(cell_14)
+
+        # Graph data structure for path computation
+        self.graph = Graph()
         
         self.parse()
 
