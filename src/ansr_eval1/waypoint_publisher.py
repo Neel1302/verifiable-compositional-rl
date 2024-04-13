@@ -17,7 +17,7 @@ from tf_transformations import euler_from_matrix
 
 from utils.utility_functions import *
 from mission import *
-
+from graph import Graph
 
 # Run the labyrinth navigation experiment.
 ''' Conventions
@@ -208,8 +208,8 @@ class MinimalPublisher(Node):
                 controller = MiniGridController(0, load_dir=controller_load_path)
                 self.controller_list.append(controller)
 
-        # Get a unique set of entry conditions for all controllers here -for Junaid's code
-        # instantiate Junaid's code - supply controller_list as an input
+        # Update graph structure (for computing paths) with mission and controller list data
+        self.mission.graph.set_data(self.mission, self.controller_list)
         
         self.obs = self.env.reset() # Get the first minigrid state
 
