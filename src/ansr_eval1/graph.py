@@ -303,6 +303,8 @@ class Graph:
                 for k, v in self.coord_to_edge.items():
                     print(f"{v[1]}: {k}, ", end="")
                     v[0].print()
+                
+                self.keep_out_edges = [False] * (self.n_edges*2)
 
                 # print("\n\nOutgoing edges:")
                 # for k, v in self.id_to_edges.items():
@@ -376,6 +378,13 @@ class Graph:
             edge_paths.append(edge_path)
         return edge_paths
 
+    def is_valid_controller_path(self, controller_path):
+        """ True if none of the controllers belong to a cell in a keep out zone """
+        for c in controller_path:
+            if self.is_keep_out_edge(c):
+                return False 
+        return True
+
     def convert_to_controllers(self, paths):
         """Paths: [(['6', '7', '3', '2'], 34), ...]"""
         controller_paths = []
@@ -386,7 +395,8 @@ class Graph:
                 (y, z) = self.id_to_node[p[0][i+1]].get_point()
                 (e, i) = self.coord_to_edge[w, x, y, z]
                 controller_path.append(i)
-            controller_paths.append(controller_path)
+            if self.is_valid_controller_path(controller_path):
+                controller_paths.append(controller_path)
         return controller_paths
 
     def find_paths(self, src, dst):
@@ -520,6 +530,8 @@ if __name__ == "__main__":
             nearest_node.print()
             print()
 
+            # Test: find paths between two arbitrary points after finding nodes closest to them
+            print("\n\nTest: find paths between two arbitrary points after finding nodes closest to them")
             p1 = Point(10, 10)
             n1 = a_graph.locate_nearest_node(p1)
             p2 = Point(20, 20)
@@ -531,17 +543,34 @@ if __name__ == "__main__":
             for p in paths:
                 print(p)
             
+            # Test: find neighbors of an arbitrary node
+            print("\n\nTest: find neighbors of an arbitrary node")
+            n1.print()
             neighbors = a_graph.get_neighboring_nodes(n1.get_id())
             print(neighbors)
 
+            # Test: find all paths between a pair of neighboring nodes
+            print("\n\nTest: find all paths between a pair of neighboring nodes")
+            n1.print()
             n2 = a_graph.get_node(neighbors[0])
+            n2.print()
             paths = a_graph.find_paths(n1.get_id(), n2.get_id())
             print(paths)
             for p in paths:
                 print(p)
 
+            # Test: Convert paths of nodes to a path of controllers
+            print("\n\nTest: Convert paths of nodes to a path of controllers")
             for p in a_graph.convert_to_controllers(paths):
                 print(p)
-
-            for p in a_graph.convert_to_edges(paths):
+            
+            print("\n\nTest: Adding controllers 16 and 17 to the list of keep out edges")
+            a_graph.keep_out_edges[16]=True
+            a_graph.keep_out_edges[17]=True
+                
+            print("\n\nTest: Paths after pruning paths with keep out edges")
+            for p in a_graph.convert_to_controllers(paths):
                 print(p)
+            
+            # for p in a_graph.convert_to_edges(paths):
+            #     print(p)
