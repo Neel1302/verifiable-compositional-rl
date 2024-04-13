@@ -3,6 +3,9 @@
 # 3. Repeat (2) but while avoiding keep out zones.
 
 from mission import Mission
+
+import sys
+sys.path.append('..')
 from Controllers.minigrid_controller import MiniGridController
 
 class Point:
@@ -367,13 +370,12 @@ if __name__ == "__main__":
             a_graph.initialize_from_file(sys.argv[2])
 
             # Test find all paths from one vertex to another
-            # paths = set()
-            # a_graph.find_paths_dfs(["a"], 'b', paths)
-            # a_graph.find_paths_dfs(["0"], '1', paths)
-            # a_graph.get_node("0").print()
-            # a_graph.get_node("1").print()
-            # print(f"{len(paths)=}")
             # a_graph.find_all_paths()
+            paths = set()
+            # a_graph.find_paths_dfs(["a"], 'b', paths)
+            a_graph.find_paths_dfs(["0"], '1', paths)
+            for path in paths:
+                path.print()
 
             # Test nearest node
             print("Enter point x y to check for nearest intersection: ", end="")

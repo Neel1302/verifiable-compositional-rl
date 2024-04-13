@@ -164,6 +164,7 @@ class MinimalPublisher(Node):
 
     def setup(self):
         # Get the minigrid entry state of the first controller
+        # TODO: can't invoke nearest_minigrid_state() before initializing graph structure
         self.mission.start_minigrid_state = self.dummy_nearest_minigrid_state(self.mission.start_airsim_state) # Replace with Junaid's code here
         self.mission.start_airsim_state = minigrid2airsim(self.mission.start_minigrid_state) # Get the airsim state for the entry state of the first controller
 
@@ -208,7 +209,8 @@ class MinimalPublisher(Node):
                 controller = MiniGridController(0, load_dir=controller_load_path)
                 self.controller_list.append(controller)
 
-        # Update graph structure (for computing paths) with mission and controller list data
+        # Initialize graph structure (for computing paths) with mission and controller list data
+        self.mission.graph = Graph()
         self.mission.graph.set_data(self.mission, self.controller_list)
         
         self.obs = self.env.reset() # Get the first minigrid state
