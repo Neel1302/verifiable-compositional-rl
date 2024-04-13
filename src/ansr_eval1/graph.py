@@ -2,52 +2,62 @@
 # 2. Calculate all possible acylic paths in the graph for each pair of vertices and sort them by their manhattan distance.
 # 3. Repeat (2) but while avoiding keep out zones.
 
-from mission import Mission
+# from mission import Mission
 
-import sys
-sys.path.append('..')
-from Controllers.minigrid_controller import MiniGridController
+# import sys
+# sys.path.append('..')
+# from Controllers.minigrid_controller import MiniGridController
 
-class Point:
-    def __init__(self, x=0, y=0):
-        self.x = x
-        self.y = y
+from collections import namedtuple
 
-    def print(self):
-        print(f"({self.x}, {self.y})")
+Point = namedtuple("Point", "x y")
 
-    def manhattan_distance(self, other):
-        return abs(self.x - other.x) + abs(self.y - other.y)
+def manhattan_distance(p1: Point, p2: Point):
+    return abs(p1.x - p2.x) + abs(p1.y - p2.y)
+
+# class Point:
+#     def __init__(self, x=0, y=0):
+#         self._xy = (x, y)
+
+#     def x(self):
+#         return self._xy[0]
+
+#     def y(self):
+#         return self._xy[1]
+
+#     def print(self):
+#         print(f"({self.x()}, {self.y()})")
+    
+#     def manhattan_distance(self, other):
+#         return abs(self.x() - other.x()) + abs(self.y() - other.y())
 
 
 class Node:
     def __init__(self, id="", loc=None):
         if loc is None:
             loc = Point(0, 0)
-        self.id = id
-        self.loc = loc
+        self._id = id
+        self._loc = loc
 
     def __init__(self, infile):
-        self.id, x, y = infile.readline().split()
-        self.loc = Point(int(x), int(y))
+        self._id, x, y = infile.readline().split()
+        self._loc = Point(int(x), int(y))
 
     def get_id(self):
-        return self.id
+        return self._id
 
     def get_point(self):
-        return self.loc
+        return self._loc
 
     def print(self):
-        print(f"{self.id}: ", end="")
-        self.loc.print()
+        print(f"{self.get_id()}: ", end="")
+        print(self.get_point())
 
     def manhattan_distance(self, other):
-        return self.loc.manhattan_distance(other.loc)
-
+        return manhattan_distance(self.get_point(), other.get_point())
 
 
 class Edge:
-
     def __init__(self, n1: Node, n2: Node):
         self.n1, self.n2 = n1, n2
         self.mh_dist = self.n1.manhattan_distance(self.n2)
@@ -56,7 +66,6 @@ class Edge:
     def from_file(cls, infile, nodes):
         id1, id2 = infile.readline().split()
         return cls(nodes[id1], nodes[id2])
-
 
     def get_node1(self):
         return self.n1
@@ -127,7 +136,7 @@ class Graph:
         self.id_to_node = {}
         self.id_to_edges = {}
         self.id_to_paths = {}
-        self.keep_out_edges = [] # T/F for each edge; T=> keep-out edge                                
+        self.keep_out_edges = [] # T/F for each edge; T=> keep-out edge
     
     def clear(self):
         self.n_nodes = 0
@@ -160,17 +169,17 @@ class Graph:
         n2_node = self.id_to_node[n2]
         return n1_node.manhattan_distance(n2_node)
 
-    def set_data(self, mission: Mission, controllers: list[MiniGridController]):
-        """
-        Read graph from Mission object and list of controllers
-        and populate nodes, edges and keep_out_zone.
-        There are two controllers per cell:
-        Cell i corresponds to Controller 2i and 2i+1
-        """
+    # def set_data(self, mission: Mission, controllers: list[MiniGridController]):
+    #     """
+    #     Read graph from Mission object and list of controllers
+    #     and populate nodes, edges and keep_out_zone.
+    #     There are two controllers per cell:
+    #     Cell i corresponds to Controller 2i and 2i+1
+    #     """
 
-        # Mission defines cells (i.e. edges)
-        # Controllers are associated with initial and final states
-        pass
+    #     # Mission defines cells (i.e. edges)
+    #     # Controllers are associated with initial and final states
+    #     pass     
 
     def initialize_from_file(self, file_name):
         """
@@ -249,40 +258,68 @@ class Graph:
                 if i != j:
                     src = self.nodes[i]
                     dst = self.nodes[j]
-                    paths = set()
-                    self.find_paths(src, dst, paths)
+                    paths = self.find_paths(src.get_id(), dst.get_id())
                     self.id_to_paths[src.get_id() + " " + dst.get_id()] = paths
-                    reverse_paths = set()
-                    for path in paths:
-                        reverse_paths.add(' '.join(reversed(path.split())))
+                    reverse_paths = []
+                    for path, mh in paths:
+                        reverse_path = list(reversed(path))
+                        reverse_paths.append((reverse_path, mh))
                     self.id_to_paths[dst.get_id() + " " + src.get_id()] = reverse_paths
         
-        for node_id, paths in self.id_to_paths.items():
-            sorted_paths = []
-            print(node_id + ":", len(paths))
-            for path in paths:
-                nodes_list = path.split()
-                mh = len(nodes_list) # use length of path as tie-breaker in mh sort
-                for i in range(len(nodes_list) - 1):
-                    mh += self.manhattan_distance(nodes_list[i], nodes_list[i+1])
-                sorted_paths.append((path, mh))
-            sorted_paths.sort(key=lambda x: x[1])
-            for path, mh in sorted_paths:
-                print("\t", mh, ":", path)
-        
-        return 0
+        return self.id_to_paths
 
-    def find_paths(self, src, dst, paths):
+    def find_paths_to_cell(self, src, dst1, dst2, exclude=[]):
+        """
+        Find all paths between source and destination nodes
+        such that the path ends in dst1, dst2 or dst2, dst1.
+        
+        Args:
+        src (str): Source node.
+        dst1 (str): Destination node 1.
+        dst2 (str): Destination node 2.
+        exclude ([(str1, str2)]): Cells to exclude from paths.
+        """
+
+        paths = self.find_paths(src, dst1)
+        # print(f"Paths from {src} to {dst1}: {len(paths)}")
+        paths += self.find_paths(src, dst2)
+        # print(f"Paths from {src} to {dst1, dst2}: {len(paths)}")
+        
+        pruned_paths = [(path, mh) for path, mh in paths
+                        if (len(path) >= 2 and
+                            ((path[-1]==dst1 and path[-2]==dst2)
+                             or (path[-1]==dst2 and path[-2]==dst1)))]        
+        pruned_paths.sort(key=lambda x: x[1])
+        return pruned_paths
+    
+    def convert_cell_id_to_controller_id(self, cell_id: int):
+        pass
+
+    def convert_to_controllers(self, paths):
+        """Paths: [("n0 n1 n2 n3", mh), ...]"""
+        pass
+
+    def find_paths(self, src, dst):
         """
         Find all paths between source and destination nodes.
         
         Args:
-        src (node): Source node.
-        dst (node): Destination node.
+        src (str): Source node.
+        dst (str): Destination node.
         paths (set): Set to store paths.
         """
-        path_from_src = [src.get_id()]
-        self.find_paths_dfs(path_from_src, dst.get_id(), paths)
+        paths = []
+        path_from_src = [src]
+        self.find_paths_dfs(path_from_src, dst, paths)
+        sorted_paths = []
+        for path in paths:
+            nodes_list = path
+            mh = len(nodes_list) # use length of path as tie-breaker in mh sort
+            for i in range(len(nodes_list) - 1):
+                mh += self.manhattan_distance(nodes_list[i], nodes_list[i+1])
+            sorted_paths.append((path, mh))
+        sorted_paths.sort(key=lambda x: x[1])
+        return sorted_paths
 
     def find_paths_dfs(self, path_from_src, dst, paths):
         """
@@ -295,30 +332,17 @@ class Graph:
         """
         src = path_from_src[-1]
 
-        # print(f"{path_from_src=}, {src=}, {dst=}")
-        
         if src == dst:
-            # print(f"Reached {dst}")
-            paths.add(' '.join(path_from_src))
+            paths.append(path_from_src.copy())
             return
 
         outgoing = self.id_to_edges.get(src, [])
         for out_edge in outgoing:
             out = out_edge.get_node2().get_id()
-            # print(f"{out=}, ")
-            # print(' '.join(path_from_src))
-            if not Graph.node_in_path(out, path_from_src): # avoid loops in paths
+            if out not in path_from_src: # avoid loops in paths
                 path_from_src.append(out)
                 self.find_paths_dfs(path_from_src, dst, paths)
                 path_from_src.pop()
-
-    @staticmethod
-    def node_in_path(node : str, path : list[str]):
-        """Search for string in a list of strings"""
-        for s in path:
-            if node == s:
-                return True
-        return False
 
     def locate_nearest_node(self, p: Point):
         """
@@ -333,7 +357,7 @@ class Graph:
         assert(len(self.nodes) > 0)
 
         nearest_node = 0
-        min_mh = p.manhattan_distance(self.nodes[nearest_node].get_point())
+        min_mh = manhattan_distance(p, self.nodes[nearest_node].get_point())
         
         # print("0: \tPoint:", end=" ")
         # p.print()
@@ -344,7 +368,7 @@ class Graph:
         # print()
         
         for i in range(1, self.n_nodes):
-            mh = p.manhattan_distance(self.nodes[i].get_point())
+            mh = manhattan_distance(p, self.nodes[i].get_point())
             if mh < min_mh:
                 nearest_node = i
                 min_mh = mh
@@ -369,20 +393,40 @@ if __name__ == "__main__":
             a_graph = Graph()
             a_graph.initialize_from_file(sys.argv[2])
 
-            # Test find all paths from one vertex to another
-            # a_graph.find_all_paths()
-            paths = set()
-            # a_graph.find_paths_dfs(["a"], 'b', paths)
-            a_graph.find_paths_dfs(["0"], '1', paths)
-            for path in paths:
-                path.print()
+            # Test: find all paths in the graph
+            print("\n\nTest: find all paths in the graph")
+            id_to_paths = a_graph.find_all_paths()
+            for node_id, paths in id_to_paths.items():
+                print(node_id + ":", len(paths))
+                for path, mh in paths:
+                    print("\t", mh, ":", path)
+        
+            # Test: find all paths from one vertex to another
+            print("\n\nTest: find all paths from one vertex to another")
+            sorted_paths = a_graph.find_paths('0', '1')
+            print(f"\nPaths from 0 to 1: {len(sorted_paths)}")
+            for path, mh in sorted_paths:
+                print("\t", mh, ":", path)
+            sorted_paths = a_graph.find_paths('0', '2')
+            print(f"\nPaths from 0 to 2: {len(sorted_paths)}")
+            for path, mh in sorted_paths:
+                print("\t", mh, ":", path)
 
-            # Test nearest node
-            print("Enter point x y to check for nearest intersection: ", end="")
-            x, y = map(int, input().split())
+            # Test: find all paths from a vertex to a cell
+            print("\n\nTest: find all paths from a vertex to a cell")
+            sorted_paths = a_graph.find_paths_to_cell('0', '1', '2')
+            print(f"\nPaths from 0 ending with 1,2 or 2,1: {len(sorted_paths)}")
+            for path, mh in sorted_paths:
+                print("\t", mh, ":", path)
+
+            # Test: find the nearest vertex in the graph to the input coordinates
+            # print("Enter point x y to check for nearest intersection: ", end="")
+            # x, y = map(int, input().split())
+            print("\n\nTest: find the nearest vertex in the graph to the input coordinates")
+            x, y = 10, 10
             p = Point(x, y)
             nearest_node = a_graph.locate_nearest_node(p)
-            print("Nearest node is ", end="")
+            print(f"Nearest node to ({x},{y}) is ", end="")
             nearest_node.print()
             print()
 
