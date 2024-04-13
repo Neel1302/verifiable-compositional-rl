@@ -82,6 +82,7 @@ def sort_points_by_distance(points, source):
         points.sort(key = lambda p: (p[0] - source[0])**2 + (p[1] - source[1])**2)
         return points
 
+
 class Mission:
 
     def __init__(self, descriptionFile, configFile):
@@ -268,8 +269,7 @@ class Mission:
                     print(points)
                 else:
                     return [x1, y1]
-        return [1e5, 1e5]
-
+        return None
 
     def getRouteEntry(self, route, source_point):
         # TODO
@@ -291,7 +291,7 @@ class Mission:
                     points.pop()
                 else:
                     return route_point
-
+        return None
 
 if __name__ == "__main__":
         mission = Mission('../../../mission-schema/examples/Maneuver/RouteSearch/RSM002/description.json', '../../../mission-schema/examples/Maneuver/RouteSearch/RSM002/config.json') 
@@ -339,5 +339,8 @@ if __name__ == "__main__":
         point_list = points[:] # make a copy
         print('points', points)
         source = [0, 0]
+        print(sort_points_by_distance(point_list, source))
+        print(mission.getRouteEntry(mission.route_list[0], source))
+        source = [-200, -200]
         print(sort_points_by_distance(point_list, source))
         print(mission.getRouteEntry(mission.route_list[0], source))
