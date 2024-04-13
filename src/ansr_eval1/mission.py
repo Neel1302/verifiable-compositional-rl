@@ -316,12 +316,12 @@ if __name__ == "__main__":
             print("t_start ", zone.t_start)
             print("t_end ", zone.t_end)
             x,y = zone.polygon.exterior.xy
-            #plt.plot(x,y)
+            plt.plot(x,y)
 
         for cell in mission.cells:
             print(cell.in_keep_out_zone)
             x,y = cell.polygon.exterior.xy
-            plt.plot(x,y)
+            #plt.plot(x,y)
 
         for route in mission.route_list:
             for points in route.points_list:
@@ -342,5 +342,8 @@ if __name__ == "__main__":
         print(sort_points_by_distance(point_list, source))
         print(mission.getRouteEntry(mission.route_list[0], source))
         source = [-200, -200]
+        print(sort_points_by_distance(point_list, source))
+        print(mission.getRouteEntry(mission.route_list[0], source))
+        source = [-100, 90]
         print(sort_points_by_distance(point_list, source))
         print(mission.getRouteEntry(mission.route_list[0], source))
