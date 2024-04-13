@@ -129,6 +129,9 @@ class Mission:
         self.cells.append(cell_12)
         self.cells.append(cell_13)
         self.cells.append(cell_14)
+
+        # Graph data structure for path computation
+        self.graph = None
         
         self.parse()
 
