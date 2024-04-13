@@ -2,6 +2,9 @@
 # 2. Calculate all possible acylic paths in the graph for each pair of vertices and sort them by their manhattan distance.
 # 3. Repeat (2) but while avoiding keep out zones.
 
+from mission import Mission
+from Controllers.minigrid_controller import MiniGridController
+
 class Point:
     def __init__(self, x=0, y=0):
         self.x = x
@@ -68,7 +71,6 @@ class Edge:
         return Edge(self.n2, self.n1)
 
 
-
 class Koz:
     # Keep out zone;
     # TODO: assuming convex polygon with edges listed clockwise
@@ -121,8 +123,8 @@ class Graph:
         self.edges = []
         self.id_to_node = {}
         self.id_to_edges = {}
-        self.id_to_paths = {} 
-        # self.keep_out_zone = Koz()
+        self.id_to_paths = {}
+        self.keep_out_edges = [] # T/F for each edge; T=> keep-out edge                                
     
     def clear(self):
         self.n_nodes = 0
@@ -133,7 +135,7 @@ class Graph:
         self.id_to_node.clear()
         self.id_to_edges.clear()
         self.id_to_paths.clear()
-        # self.keep_out_zone = Koz()
+        self.keep_out_edges.clear()
 
     def read_node(self, infile):
         return Node(infile)
@@ -146,13 +148,28 @@ class Graph:
 
     def get_node(self, node: str):
         return self.id_to_node[node]
+    
+    def is_keep_out_edge(self, index: int) -> bool:
+        return self.keep_out_edges[index]
 
     def manhattan_distance(self, n1: str, n2: str):
         n1_node = self.id_to_node[n1]
         n2_node = self.id_to_node[n2]
         return n1_node.manhattan_distance(n2_node)
-        
-    def read_graph(self, file_name):
+
+    def set_data(self, mission: Mission, controllers: list[MiniGridController]):
+        """
+        Read graph from Mission object and list of controllers
+        and populate nodes, edges and keep_out_zone.
+        There are two controllers per cell:
+        Cell i corresponds to Controller 2i and 2i+1
+        """
+
+        # Mission defines cells (i.e. edges)
+        # Controllers are associated with initial and final states
+        pass
+
+    def initialize_from_file(self, file_name):
         """
         Read graph from a file and populate nodes, edges, and keep_out_zone.
         
@@ -310,16 +327,18 @@ class Graph:
         Returns:
         node: Nearest node to the given point.
         """
+        assert(len(self.nodes) > 0)
+
         nearest_node = 0
         min_mh = p.manhattan_distance(self.nodes[nearest_node].get_point())
         
-        print("0: \tPoint:", end=" ")
-        p.print()
-        print("\t Current Node:", end=" ")
-        self.nodes[nearest_node].print()
-        print("\t Nearest Node:", end=" ")
-        self.nodes[nearest_node].print()
-        print()
+        # print("0: \tPoint:", end=" ")
+        # p.print()
+        # print("\t Current Node:", end=" ")
+        # self.nodes[nearest_node].print()
+        # print("\t Nearest Node:", end=" ")
+        # self.nodes[nearest_node].print()
+        # print()
         
         for i in range(1, self.n_nodes):
             mh = p.manhattan_distance(self.nodes[i].get_point())
@@ -327,13 +346,13 @@ class Graph:
                 nearest_node = i
                 min_mh = mh
             
-            print(i, ": \tPoint:", end=" ")
-            p.print()
-            print("\t Current Node:", end=" ")
-            self.nodes[i].print()
-            print("\t Nearest Node:", end=" ")
-            self.nodes[nearest_node].print()
-            print()
+            # print(i, ": \tPoint:", end=" ")
+            # p.print()
+            # print("\t Current Node:", end=" ")
+            # self.nodes[i].print()
+            # print("\t Nearest Node:", end=" ")
+            # self.nodes[nearest_node].print()
+            # print()
         
         return self.nodes[nearest_node]
 
@@ -345,7 +364,7 @@ if __name__ == "__main__":
         if sys.argv[1] == "-f" and len(sys.argv) > 2:
             print(f"Reading graph file: {sys.argv[2]}")
             a_graph = Graph()
-            a_graph.read_graph(sys.argv[2])
+            a_graph.initialize_from_file(sys.argv[2])
 
             # Test find all paths from one vertex to another
             # paths = set()
