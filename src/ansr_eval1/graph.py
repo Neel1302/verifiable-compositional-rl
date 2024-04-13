@@ -179,6 +179,7 @@ class Graph:
     def get_neighboring_nodes(self, node: str):
         return [n.get_node2().get_id() for n in self.id_to_edges[node]]
     
+    # TODO: Integrate and test.
     def set_data(self, mission: Mission, controllers: list[MiniGridController]):
         """
         Read graph from Mission object and list of controllers
@@ -231,13 +232,13 @@ class Graph:
             # No need to generate reverse edge since its a separate controller
             self.edges.append(e)
             self.id_to_edges.setdefault(n1.get_id(), []).append(e)
-            self.coord_to_edge[w, x, y, z] = e
+            self.coord_to_edge[w, x, y, z] = (e, i)
         
         for i in range(self.n_edges):
             self.edges[i].print()
         for k, v in self.coord_to_edge.items():
-            print(k)
-            v.print()
+            print(f"{v[1]}: {k}, ", end="")
+            v[0].print()
 
         # Determine keep out zones cells (i.e. edges)
         self.keep_out_edges = []
@@ -245,7 +246,6 @@ class Graph:
         for c in mission.cells:
             self.keep_out_edges.append(c.in_keep_out_zone)
             self.keep_out_edges.append(c.in_keep_out_zone)
-      
 
     def initialize_from_file(self, file_name):
         """
@@ -294,15 +294,15 @@ class Graph:
                     self.id_to_edges.setdefault(e.get_node2().get_id(), []).append(e_rev)
                     w, x = e.get_node1().get_point()
                     y, z = e.get_node2().get_point()
-                    self.coord_to_edge[w, x, y, z] = e
-                    self.coord_to_edge[y, z, w, x] = e_rev
+                    self.coord_to_edge[w, x, y, z] = (e, 2*i)
+                    self.coord_to_edge[y, z, w, x] = (e_rev, 2*i+1)
                 
                 for i in range(self.n_edges):
                     self.edges[i].print()
                 
                 for k, v in self.coord_to_edge.items():
-                    print(k)
-                    v.print()
+                    print(f"{v[1]}: {k}, ", end="")
+                    v[0].print()
 
                 # print("\n\nOutgoing edges:")
                 # for k, v in self.id_to_edges.items():
@@ -364,12 +364,30 @@ class Graph:
         pruned_paths.sort(key=lambda x: x[1])
         return pruned_paths
     
-    def convert_cell_id_to_controller_id(self, cell_id: int):
-        pass
+    def convert_to_edges(self, paths):
+        """Paths: [(['6', '7', '3', '2'], 34), ...]"""
+        edge_paths = []
+        for p in paths:
+            edge_path = []
+            for i in range(len(p[0])-1):
+                (w, x) = self.id_to_node[p[0][i]].get_point()
+                (y, z) = self.id_to_node[p[0][i+1]].get_point()
+                edge_path.append((w, x, y, z))
+            edge_paths.append(edge_path)
+        return edge_paths
 
     def convert_to_controllers(self, paths):
-        """Paths: [("n0 n1 n2 n3", mh), ...]"""
-        pass
+        """Paths: [(['6', '7', '3', '2'], 34), ...]"""
+        controller_paths = []
+        for p in paths:
+            controller_path = []
+            for i in range(len(p[0])-1):
+                (w, x) = self.id_to_node[p[0][i]].get_point()
+                (y, z) = self.id_to_node[p[0][i+1]].get_point()
+                (e, i) = self.coord_to_edge[w, x, y, z]
+                controller_path.append(i)
+            controller_paths.append(controller_path)
+        return controller_paths
 
     def find_paths(self, src, dst):
         """
@@ -465,42 +483,42 @@ if __name__ == "__main__":
             a_graph = Graph()
             a_graph.initialize_from_file(sys.argv[2])
 
-            # # Test: find all paths in the graph
-            # print("\n\nTest: find all paths in the graph")
-            # id_to_paths = a_graph.find_all_paths()
-            # for node_id, paths in id_to_paths.items():
-            #     print(node_id + ":", len(paths))
-            #     for path, mh in paths:
-            #         print("\t", mh, ":", path)
+            # Test: find all paths in the graph
+            print("\n\nTest: find all paths in the graph")
+            id_to_paths = a_graph.find_all_paths()
+            for node_id, paths in id_to_paths.items():
+                print(node_id + ":", len(paths))
+                for path, mh in paths:
+                    print("\t", mh, ":", path)
         
-            # # Test: find all paths from one vertex to another
-            # print("\n\nTest: find all paths from one vertex to another")
-            # sorted_paths = a_graph.find_paths('0', '1')
-            # print(f"\nPaths from 0 to 1: {len(sorted_paths)}")
-            # for path, mh in sorted_paths:
-            #     print("\t", mh, ":", path)
-            # sorted_paths = a_graph.find_paths('0', '2')
-            # print(f"\nPaths from 0 to 2: {len(sorted_paths)}")
-            # for path, mh in sorted_paths:
-            #     print("\t", mh, ":", path)
+            # Test: find all paths from one vertex to another
+            print("\n\nTest: find all paths from one vertex to another")
+            sorted_paths = a_graph.find_paths('0', '1')
+            print(f"\nPaths from 0 to 1: {len(sorted_paths)}")
+            for path, mh in sorted_paths:
+                print("\t", mh, ":", path)
+            sorted_paths = a_graph.find_paths('0', '2')
+            print(f"\nPaths from 0 to 2: {len(sorted_paths)}")
+            for path, mh in sorted_paths:
+                print("\t", mh, ":", path)
 
-            # # Test: find all paths from a vertex to a cell
-            # print("\n\nTest: find all paths from a vertex to a cell")
-            # sorted_paths = a_graph.find_paths_to_cell('0', '1', '2')
-            # print(f"\nPaths from 0 ending with 1,2 or 2,1: {len(sorted_paths)}")
-            # for path, mh in sorted_paths:
-            #     print("\t", mh, ":", path)
+            # Test: find all paths from a vertex to a cell
+            print("\n\nTest: find all paths from a vertex to a cell")
+            sorted_paths = a_graph.find_paths_to_cell('0', '1', '2')
+            print(f"\nPaths from 0 ending with 1,2 or 2,1: {len(sorted_paths)}")
+            for path, mh in sorted_paths:
+                print("\t", mh, ":", path)
 
-            # # Test: find the nearest vertex in the graph to the input coordinates
-            # # print("Enter point x y to check for nearest intersection: ", end="")
-            # # x, y = map(int, input().split())
-            # print("\n\nTest: find the nearest vertex in the graph to the input coordinates")
-            # x, y = 10, 10
-            # p = Point(x, y)
-            # nearest_node = a_graph.locate_nearest_node(p)
-            # print(f"Nearest node to ({x},{y}) is ", end="")
-            # nearest_node.print()
-            # print()
+            # Test: find the nearest vertex in the graph to the input coordinates
+            # print("Enter point x y to check for nearest intersection: ", end="")
+            # x, y = map(int, input().split())
+            print("\n\nTest: find the nearest vertex in the graph to the input coordinates")
+            x, y = 10, 10
+            p = Point(x, y)
+            nearest_node = a_graph.locate_nearest_node(p)
+            print(f"Nearest node to ({x},{y}) is ", end="")
+            nearest_node.print()
+            print()
 
             p1 = Point(10, 10)
             n1 = a_graph.locate_nearest_node(p1)
@@ -518,5 +536,12 @@ if __name__ == "__main__":
 
             n2 = a_graph.get_node(neighbors[0])
             paths = a_graph.find_paths(n1.get_id(), n2.get_id())
+            print(paths)
             for p in paths:
+                print(p)
+
+            for p in a_graph.convert_to_controllers(paths):
+                print(p)
+
+            for p in a_graph.convert_to_edges(paths):
                 print(p)
