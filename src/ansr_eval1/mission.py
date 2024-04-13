@@ -77,6 +77,11 @@ def pointWithinPolygon(x, y, polygon):
             return True
         return False
 
+def sort_points_by_distance(points, source):
+        #points.sort(key = lambda p: (p.x - x)**2 + (p.y - y)**2)
+        points.sort(key = lambda p: (p[0] - source[0])**2 + (p[1] - source[1])**2)
+        return points
+
 class Mission:
 
     def __init__(self, descriptionFile, configFile):
@@ -263,9 +268,31 @@ class Mission:
         return [1e5, 1e5]
 
 
+    def getRouteEntry(self, route, source_point):
+        # TODO
+        points_list = route.points_list[0]
+        route_points = points_list[:]
+        sorted_route_points = sort_points_by_distance(route_points, source)
+
+        points = []
+        points.append(source_point)
+        for route_point in sorted_route_points:
+                intersect = False
+                points.append(route_point)
+                linestring = LineString(points)
+                for zone in self.keep_out_zones:
+                    if linestring.intersects(zone.polygon):
+                        intersect = True
+                        break
+                if intersect:
+                    points.pop()
+                else:
+                    return route_point
+
+
 if __name__ == "__main__":
-        #mission = Mission('../../../mission-schema/examples/Maneuver/RouteSearch/RSM002/description.json', '../../../mission-schema/examples/Maneuver/RouteSearch/RSM002/config.json') 
-        mission = Mission('../../../mission-schema/examples/Maneuver/AreaSearch/ASM004/description.json', '../../../mission-schema/examples/Maneuver/AreaSearch/ASM004/config.json') 
+        mission = Mission('../../../mission-schema/examples/Maneuver/RouteSearch/RSM002/description.json', '../../../mission-schema/examples/Maneuver/RouteSearch/RSM002/config.json') 
+        #mission = Mission('../../../mission-schema/examples/Maneuver/AreaSearch/ASM004/description.json', '../../../mission-schema/examples/Maneuver/AreaSearch/ASM004/config.json') 
 
         for area in mission.AOI_list:
             print('AOI ', area)
@@ -304,3 +331,10 @@ if __name__ == "__main__":
 
         plt.show()
 
+
+        points = mission.route_list[0].points_list[0]
+        point_list = points[:] # make a copy
+        print('points', points)
+        source = [0, 0]
+        print(sort_points_by_distance(point_list, source))
+        print(mission.getRouteEntry(mission.route_list[0], source))
