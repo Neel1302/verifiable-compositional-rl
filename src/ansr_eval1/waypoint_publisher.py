@@ -99,7 +99,7 @@ class MinimalPublisher(Node):
         for point in AOI_points:
             airsim_state_list = []
             AOI_point_entry = self.mission.getSpecialAOIPointEntry(point)
-            if AOI_point_entry[0] == 1e5: continue
+            if AOI_point_entry is None: continue
 
             airsim_state_entry = minigrid2airsim(AOI_point_entry)
             airsim_state_AOI = minigrid2airsim(point)
