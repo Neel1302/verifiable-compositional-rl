@@ -232,6 +232,16 @@ class Mission:
             if bool:
                 cell.in_keep_out_zone = True
                 cell.keep_out_zone = zone
+            if self.cellInAnyRegion(cell):
+                cell.in_any_region = True
+
+        
+    def cellInAnyRegion(self, cell):
+        for car in self.car_list:
+            for region in car.map:
+                if cell.polygon.intersects(region.polygon):
+                    return True
+        return False
 
 
     def getSpecialAOIPoints(self):
@@ -297,8 +307,8 @@ class Mission:
         return None
 
 if __name__ == "__main__":
-        mission = Mission('../../../mission-schema/examples/Maneuver/RouteSearch/RSM002/description.json', '../../../mission-schema/examples/Maneuver/RouteSearch/RSM002/config.json') 
-        #mission = Mission('../../../mission-schema/examples/Maneuver/AreaSearch/ASM004/description.json', '../../../mission-schema/examples/Maneuver/AreaSearch/ASM004/config.json') 
+        #mission = Mission('../../../mission-schema/examples/Maneuver/RouteSearch/RSM002/description.json', '../../../mission-schema/examples/Maneuver/RouteSearch/RSM002/config.json') 
+        mission = Mission('../../../mission-schema/examples/Maneuver/AreaSearch/ASM004/description.json', '../../../mission-schema/examples/Maneuver/AreaSearch/ASM004/config.json') 
 
         for area in mission.AOI_list:
             print('AOI ', area)
@@ -316,37 +326,42 @@ if __name__ == "__main__":
                 #plt.plot(x,y)
 
         for zone in mission.keep_out_zones:
-            print("t_start ", zone.t_start)
-            print("t_end ", zone.t_end)
+            print('Keep Out Zone', zone.polygon)
+            print("t_start \t", zone.t_start)
+            print("t_end \t\t", zone.t_end)
             x,y = zone.polygon.exterior.xy
-            plt.plot(x,y)
+            #plt.plot(x,y)
 
+        cell_idx = 0
         for cell in mission.cells:
-            print(cell.in_keep_out_zone)
+            print('cell ', cell_idx)
+            print('in_keep_out_zone \t', cell.in_keep_out_zone)
+            print('in_any_region \t\t', cell.in_any_region)
             x,y = cell.polygon.exterior.xy
             #plt.plot(x,y)
+            cell_idx = cell_idx +1
 
         for route in mission.route_list:
             for points in route.points_list:
                 linestring = LineString(points)
-                plt.plot(*linestring.xy,  linewidth=7.0)
+                #plt.plot(*linestring.xy,  linewidth=7.0)
 
             for rect in route.rectangles:
                 x,y = rect.exterior.xy
                 #plt.plot(x,y)
 
-        plt.show()
+        #plt.show()
 
-
-        points = mission.route_list[0].points_list[0]
-        point_list = points[:] # make a copy
-        print('points', points)
-        source = [0, 0]
-        print(sort_points_by_distance(point_list, source))
-        print(mission.getRouteEntry(mission.route_list[0], source))
-        source = [-200, -200]
-        print(sort_points_by_distance(point_list, source))
-        print(mission.getRouteEntry(mission.route_list[0], source))
-        source = [-100, 90]
-        print(sort_points_by_distance(point_list, source))
-        print(mission.getRouteEntry(mission.route_list[0], source))
+        if (mission.mission_class == 'Route Search'):
+            points = mission.route_list[0].points_list[0]
+            point_list = points[:] # make a copy
+            print('points', points)
+            source = [0, 0]
+            print(sort_points_by_distance(point_list, source))
+            print(mission.getRouteEntry(mission.route_list[0], source))
+            source = [-200, -200]
+            print(sort_points_by_distance(point_list, source))
+            print(mission.getRouteEntry(mission.route_list[0], source))
+            source = [-100, 90]
+            print(sort_points_by_distance(point_list, source))
+            print(mission.getRouteEntry(mission.route_list[0], source))
