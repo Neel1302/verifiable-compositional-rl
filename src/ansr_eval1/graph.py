@@ -180,7 +180,7 @@ class Graph:
         return [n.get_node2().get_id() for n in self.id_to_edges[node]]
     
     # TODO: Integrate and test.
-    def set_data(self, mission: Mission, controllers: list[MiniGridController]):
+    def set_data(self, mission, controllers):
         """
         Read graph from Mission object and list of controllers
         and populate nodes, edges and keep_out_zone.
