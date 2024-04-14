@@ -290,6 +290,7 @@ class Graph:
                     e = self.read_edge(infile)
                     e_rev = e.reverse()
                     self.edges.append(e)
+                    self.edges.append(e_rev)
                     self.id_to_edges.setdefault(e.get_node1().get_id(), []).append(e)
                     self.id_to_edges.setdefault(e.get_node2().get_id(), []).append(e_rev)
                     w, x = e.get_node1().get_point()
@@ -297,6 +298,7 @@ class Graph:
                     self.coord_to_edge[w, x, y, z] = (e, 2*i)
                     self.coord_to_edge[y, z, w, x] = (e_rev, 2*i+1)
                 
+                self.n_edges *= 2
                 for i in range(self.n_edges):
                     self.edges[i].print()
                 
@@ -358,7 +360,7 @@ class Graph:
         # print(f"Paths from {src} to {dst1}: {len(paths)}")
         paths += self.find_paths(src, dst2)
         # print(f"Paths from {src} to {dst1, dst2}: {len(paths)}")
-        
+
         pruned_paths = [(path, mh) for path, mh in paths
                         if (len(path) >= 2 and
                             ((path[-1]==dst1 and path[-2]==dst2)
@@ -378,15 +380,19 @@ class Graph:
             edge_paths.append(edge_path)
         return edge_paths
 
-    def is_valid_controller_path(self, controller_path):
-        """ True if none of the controllers belong to a cell in a keep out zone """
-        for c in controller_path:
-            if self.is_keep_out_edge(c):
+    def is_valid_controller_path(self, controller_path, ignore_last=False):
+        """ True if none of the controllers belong to a cell in a keep out zone
+        If ignore_last if True, the last controller is not checked for keep-out zone inclusion"""
+        length = len(controller_path) if (not ignore_last) else (len(controller_path) - 1)
+        for i in range(length):
+            if self.is_keep_out_edge(controller_path[i]):
                 return False 
         return True
 
-    def convert_to_controllers(self, paths):
-        """Paths: [(['6', '7', '3', '2'], 34), ...]"""
+    def convert_to_controllers(self, paths, prune_koe=False, include_last=False):
+        """Paths: [(['6', '7', '3', '2'], 34), ...]
+        If prune_koe is True, paths with controllers that belong to keep-out zone cells are excluded
+        If include_last is True, the last controller is not checked for presence in keep-out zone """
         controller_paths = []
         for p in paths:
             controller_path = []
@@ -395,8 +401,15 @@ class Graph:
                 (y, z) = self.id_to_node[p[0][i+1]].get_point()
                 (e, i) = self.coord_to_edge[w, x, y, z]
                 controller_path.append(i)
-            if self.is_valid_controller_path(controller_path):
-                controller_paths.append(controller_path)
+            controller_paths.append(controller_path)
+        
+        if prune_koe:
+            pruned_controller_paths = []
+            for p in controller_paths:
+                if self.is_valid_controller_path(p, include_last):
+                    pruned_controller_paths.append(p)
+            return pruned_controller_paths
+
         return controller_paths
 
     def find_paths(self, src, dst):
@@ -443,6 +456,12 @@ class Graph:
                 path_from_src.append(out)
                 self.find_paths_dfs(path_from_src, dst, paths)
                 path_from_src.pop()
+
+    def find_controllers_from_node_to_edge(self, x: int, y: int, cell_id: int, prune_koe=False, include_last=False):
+        node = self.get_node_from_point((x, y))
+        edge = self.edges[cell_id*2]
+        path = self.find_paths_to_cell(node.get_id(), edge.get_node1().get_id(), edge.get_node2().get_id())
+        return self.convert_to_controllers(path, prune_koe, include_last)
 
     def locate_nearest_node(self, p: Point):
         """
@@ -561,7 +580,7 @@ if __name__ == "__main__":
 
             # Test: Convert paths of nodes to a path of controllers
             print("\n\nTest: Convert paths of nodes to a path of controllers")
-            for p in a_graph.convert_to_controllers(paths):
+            for p in a_graph.convert_to_controllers(paths, True, True):
                 print(p)
             
             print("\n\nTest: Adding controllers 16 and 17 to the list of keep out edges")
@@ -569,8 +588,46 @@ if __name__ == "__main__":
             a_graph.keep_out_edges[17]=True
                 
             print("\n\nTest: Paths after pruning paths with keep out edges")
-            for p in a_graph.convert_to_controllers(paths):
+            for p in a_graph.convert_to_controllers(paths, True, True):
                 print(p)
             
-            # for p in a_graph.convert_to_edges(paths):
-            #     print(p)
+            print("\n\nTest: Removing controllers 16 and 17 to the list of keep out edges")
+            a_graph.keep_out_edges[16]=False
+            a_graph.keep_out_edges[17]=False
+                
+            # Test: find all paths from a vertex to a cell
+            print("\n\nTest: find all paths from a vertex to a cell")
+            print(f"\nPaths from 0 ending with 1,2 or 2,1: {len(sorted_paths)}")
+            for p in a_graph.convert_to_controllers(sorted_paths, True, True):
+                print(p)
+
+            print("\n\nTest: Adding controllers 6, 7, 16 and 17 to the list of keep out edges")
+            a_graph.keep_out_edges[16]=True
+            a_graph.keep_out_edges[17]=True
+            a_graph.keep_out_edges[6]=True
+            a_graph.keep_out_edges[7]=True
+                
+            print("\n\nTest: Paths after pruning paths with keep out edges")
+            for p in a_graph.convert_to_controllers(sorted_paths, True, True):
+                print(p)
+            
+            print("\n\nTest: Removing keep out edges")
+            a_graph.keep_out_edges[16]=False
+            a_graph.keep_out_edges[17]=False
+            a_graph.keep_out_edges[6]=False
+            a_graph.keep_out_edges[7]=False
+                
+            print("\n\nTest: Find controllers from coord(2, 2) to cell 12")
+            for p in a_graph.find_controllers_from_node_to_edge(2, 2, 12, True, True):
+                print(p)
+
+            print("\n\nTest: Adding controllers 6, 7, 16 and 17 to the list of keep out edges")
+            a_graph.keep_out_edges[16]=True
+            a_graph.keep_out_edges[17]=True
+            a_graph.keep_out_edges[6]=True
+            a_graph.keep_out_edges[7]=True
+
+            print("\n\nTest: Find controllers from coord(2, 2) to cell 12")
+            for p in a_graph.find_controllers_from_node_to_edge(2, 2, 12, True, True):
+                print(p)
+
