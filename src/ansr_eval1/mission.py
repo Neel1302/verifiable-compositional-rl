@@ -29,6 +29,7 @@ class Cell:
     def __init__(self, polygon):
         self.polygon = polygon
         self.in_keep_out_zone = False
+        self.keep_out_zone = None
         self.in_any_region = False
         self.visited = False
 
@@ -59,8 +60,8 @@ def cellInKeepOutZone(cell, zone):
 def cellInAnyKeepOutZone(cell, zones):
         for zone in zones:
             if (cell.polygon.intersects(zone.polygon)):
-                return True
-        return False
+                return True, zone
+        return False, None
 
 def cellsInRegion(cells, region):
         cell_list = []
@@ -227,8 +228,10 @@ class Mission:
                 region.cells = cell_list
 
         for cell in self.cells:
-            if cellInAnyKeepOutZone(cell, self.keep_out_zones):
+            bool, zone = cellInAnyKeepOutZone(cell, self.keep_out_zones)
+            if bool:
                 cell.in_keep_out_zone = True
+                cell.keep_out_zone = zone
 
 
     def getSpecialAOIPoints(self):

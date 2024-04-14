@@ -19,6 +19,10 @@ from utils.utility_functions import *
 from mission import *
 from graph import Graph
 
+from shapely.geometry import Polygon, Point, LineString
+from shapely.ops import nearest_points
+from shapely import distance
+
 # Run the labyrinth navigation experiment.
 ''' Conventions
 
@@ -285,27 +289,69 @@ class MinimalPublisher(Node):
             # Iterate through each cell that covers the region -> Plan how to get to one of the destination the cell states from current state
             for cell_idx in region.cells:
                 if cell_idx in self.visited_cell_idxs: continue # Skip if we already visited the cell
+                
                 # Obtain a list of controllers yielding shortest path to cell of interest that does not intersect with any KOZ
                 hl_controller_idx_list = self.dummy_hl_controller(cell_idx) # Replace with Junaid's code
                 hl_controller_list = self.get_controller_list(hl_controller_idx_list)
                 if len(hl_controller_idx_list) == 0: continue # Skip if we have no path obtained
+                
                 # Do not visit the same cell again
                 for controller_idx in hl_controller_idx_list:
                     if math.floor(controller_idx/2) not in self.visited_cell_idxs: self.visited_cell_idxs.append(math.floor(controller_idx/2))
                 print("Visited Cells:", self.visited_cell_idxs)
-                # Execute controllers in minigrid and publish waypoints
-                self.run_minigrid_solver_and_pub(hl_controller_list)
-                current_minigrid_state = airsim2minigrid((self.n_airsim, self.e_airsim, 0))
-                final_minigrid_state = list(hl_controller_list[-1].get_final_states()[0])
-                # While moving to the waypoints keep track of detetcted entities
-                while (current_minigrid_state != final_minigrid_state):
-                    rclpy.spin_once(self)
+                
+                # Only go upto the penultimate cell if a KOZ is in the last cell
+                if self.mission.cells[cell_idx].in_keep_out_zone:
+                    print("Cell {} is in KOZ and controller list is: {}".format(cell_idx, hl_controller_list))
+                    target_controller_idx = hl_controller_idx_list[-1]
+                    target_controller = hl_controller_list[-1]
+                    hl_controller_idx_list.pop()
+                    hl_controller_list.pop()
+                
+                if len(hl_controller_idx_list) != 0:
+                    # Execute controllers in minigrid and publish waypoints
+                    self.run_minigrid_solver_and_pub(hl_controller_list)
                     current_minigrid_state = airsim2minigrid((self.n_airsim, self.e_airsim, 0))
-                    print("Current State: {}, Final State: {}".format(current_minigrid_state, final_minigrid_state))   
-                    if car.id in self.detected_entity_ids:
-                        # self.pub_waypoint([self.mission.start_airsim_state]) # Need to think about and implementt how we will get back to prevoius state te next APU.
-                        return
+                    final_minigrid_state = list(hl_controller_list[-1].get_final_states()[0])
+                    
+                    # While moving to the waypoints keep track of detetcted entities
+                    while (current_minigrid_state != final_minigrid_state):
+                        rclpy.spin_once(self)
+                        current_minigrid_state = airsim2minigrid((self.n_airsim, self.e_airsim, 0))
+                        print("Current State: {}, Final State: {}".format(current_minigrid_state, final_minigrid_state))   
+                        if car.id in self.detected_entity_ids:
+                            # self.pub_waypoint([self.mission.start_airsim_state]) # Need to think about and implement how we will get back to prevoius state.
+                            return
+                
+                if self.mission.cells[cell_idx].in_keep_out_zone:            
+                    # Once at entry to the target cell, check which controller has
+                    self.init_airsim_position = [self.n_airsim, self.e_airsim, 0]
+                    self.init_airsim_point = Point(self.n_airsim, self.e_airsim)
+                    curr_airsim_point = Point(self.n_airsim, self.e_airsim)
+                    koz = self.mission.cells[cell_idx].keep_out_zone
+                    print("TEST: ",koz.polygon, curr_airsim_point)
+                    nearest_point, _ = nearest_points(koz.polygon, curr_airsim_point)
+                    target_airsim_position = [nearest_point.x, nearest_point.y, 0]
+                    self.pub_waypoint([target_airsim_position])
 
+                    # While moving to the nearest point to the KOZ keep track of detetcted entities
+                    print("Nearest AirSim Position to KOZ: "+str(nearest_point))
+                    while (distance(curr_airsim_point, nearest_point) > 15):
+                        rclpy.spin_once(self)
+                        curr_airsim_point = Point(self.n_airsim, self.e_airsim)
+                        print("Current AirSim Position: "+str(curr_airsim_point))
+                        if car.id in self.detected_entity_ids:
+                            break
+                    
+                    # Return back to entry of the last cell
+                    self.pub_waypoint([self.init_airsim_position])
+                    print("Moving back to initial position: "+str(self.init_airsim_position))
+                    while (curr_airsim_point != self.init_airsim_point):
+                        rclpy.spin_once(self)
+                        curr_airsim_point = Point(self.n_airsim, self.e_airsim)
+                        print("Current AirSim Position: "+str(curr_airsim_point))
+
+                
     def pub_waypoint(self, obs_list):
         waypoint_msg = WaypointPath()
         
