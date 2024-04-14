@@ -212,11 +212,154 @@ class MinimalPublisher(Node):
             if os.path.isdir(controller_load_path):
                 controller = MiniGridController(0, load_dir=controller_load_path)
                 self.controller_list.append(controller)
+        
+        # re-order the controllers by index in ascending order
+        reordered_list = []
+        for i in range(len(self.controller_list)):
+            for controller in self.controller_list:
+                if controller.controller_ind == i:
+                    reordered_list.append(controller)
+        
+        self.controller_list = reordered_list
 
         # Initialize graph structure (for computing paths) with mission and controller list data
         self.mission.graph = Graph()
         self.mission.graph.set_data(self.mission, self.controller_list)
+
+        a_graph = self.mission.graph
+        # # Test: find all paths in the graph
+        # print("\n\nTest: find all paths in the graph")
+        # id_to_paths = a_graph.find_all_paths()
+        # for node_id, paths in id_to_paths.items():
+        #     print(node_id + ":", len(paths))
+        #     for path, mh in paths:
+        #         print("\t", mh, ":", path)
+    
+        # # Test: find all paths from one vertex to another
+        # print("\n\nTest: find all paths from one vertex to another")
+        # sorted_paths = a_graph.find_paths('0', '1')
+        # print(f"\nPaths from 0 to 1: {len(sorted_paths)}")
+        # for path, mh in sorted_paths:
+        #     print("\t", mh, ":", path)
+        # sorted_paths = a_graph.find_paths('0', '2')
+        # print(f"\nPaths from 0 to 2: {len(sorted_paths)}")
+        # for path, mh in sorted_paths:
+        #     print("\t", mh, ":", path)
+
+        # # Test: find all paths from a vertex to a cell
+        # print("\n\nTest: find all paths from a vertex to a cell")
+        # sorted_paths = a_graph.find_paths_to_cell('0', '1', '2')
+        # print(f"\nPaths from 0 ending with 1,2 or 2,1: {len(sorted_paths)}")
+        # for path, mh in sorted_paths:
+        #     print("\t", mh, ":", path)
+
+        # # Test: find the nearest vertex in the graph to the input coordinates
+        # # print("Enter point x y to check for nearest intersection: ", end="")
+        # # x, y = map(int, input().split())
+        # print("\n\nTest: find the nearest vertex in the graph to the input coordinates")
+        # x, y = 10, 10
+        # p = Point(x, y)
+        # nearest_node = a_graph.locate_nearest_node(p)
+        # print(f"Nearest node to ({x},{y}) is ", end="")
+        # nearest_node.print()
+        # print()
+
+        # # Test: find paths between two arbitrary points after finding nodes closest to them
+        # print("\n\nTest: find paths between two arbitrary points after finding nodes closest to them")
+        # p1 = Point(10, 10)
+        # n1 = a_graph.locate_nearest_node(p1)
+        # p2 = Point(20, 20)
+        # n2 = a_graph.locate_nearest_node(p2)
+        # n1.print()
+        # n2.print()
+
+        # paths = a_graph.find_paths(n1.get_id(), n2.get_id())
+        # for p in paths:
+        #     print(p)
         
+        # # Test: find neighbors of an arbitrary node
+        # print("\n\nTest: find neighbors of an arbitrary node")
+        # n1.print()
+        # neighbors = a_graph.get_neighboring_nodes(n1.get_id())
+        # print(neighbors)
+
+        # # Test: find all paths between a pair of neighboring nodes
+        # print("\n\nTest: find all paths between a pair of neighboring nodes")
+        # n1.print()
+        # n2 = a_graph.get_node(neighbors[0])
+        # n2.print()
+        # paths = a_graph.find_paths(n1.get_id(), n2.get_id())
+        # print(paths)
+        # for p in paths:
+        #     print(p)
+
+        # # Test: Convert paths of nodes to a path of controllers
+        # print("\n\nTest: Convert paths of nodes to a path of controllers")
+        # for p in a_graph.convert_to_controllers(paths, True, True):
+        #     print(p)
+        
+        # print("\n\nTest: Adding controllers 16 and 17 to the list of keep out edges")
+        # a_graph.keep_out_edges[16]=True
+        # a_graph.keep_out_edges[17]=True
+            
+        # print("\n\nTest: Paths after pruning paths with keep out edges")
+        # for p in a_graph.convert_to_controllers(paths, True, True):
+        #     print(p)
+        
+        # print("\n\nTest: Removing controllers 16 and 17 to the list of keep out edges")
+        # a_graph.keep_out_edges[16]=False
+        # a_graph.keep_out_edges[17]=False
+            
+        # # Test: find all paths from a vertex to a cell
+        # print("\n\nTest: find all paths from a vertex to a cell")
+        # print(f"\nPaths from 0 ending with 1,2 or 2,1: {len(sorted_paths)}")
+        # for p in a_graph.convert_to_controllers(sorted_paths, True, True):
+        #     print(p)
+
+        # print("\n\nTest: Adding controllers 6, 7, 16 and 17 to the list of keep out edges")
+        # a_graph.keep_out_edges[16]=True
+        # a_graph.keep_out_edges[17]=True
+        # a_graph.keep_out_edges[6]=True
+        # a_graph.keep_out_edges[7]=True
+            
+        # print("\n\nTest: Paths after pruning paths with keep out edges")
+        # for p in a_graph.convert_to_controllers(sorted_paths, True, True):
+        #     print(p)
+        
+        # print("\n\nTest: Removing keep out edges")
+        # a_graph.keep_out_edges[16]=False
+        # a_graph.keep_out_edges[17]=False
+        # a_graph.keep_out_edges[6]=False
+        # a_graph.keep_out_edges[7]=False
+            
+        # print("\n\nTest: Find controllers from coord(12, 6) to cell 9")
+        # for p in a_graph.find_controllers_from_node_to_edge(12, 6, 9, False, True):
+        #     print(p)
+
+        # for p in a_graph.find_controllers_from_node_to_edge(12, 6, 9, True, True):
+        #     print(p)
+
+        print("\n\nTest: Find controllers from coord(12, 6) to coord(12, 12)")
+        for p in a_graph.find_controllers_from_node_to_node(12, 6, 12, 12, False, True):
+            print(p)
+
+        print("\n\nTest: Find controllers from coord(12, 6) to coord(12, 12)")
+        for p in a_graph.find_controllers_from_node_to_node(12, 6, 12, 12, True, True):
+            print(p)
+
+        # print("\n\nTest: Adding controllers 6, 7, 16 and 17 to the list of keep out edges")
+        # a_graph.keep_out_edges[16]=True
+        # a_graph.keep_out_edges[17]=True
+        # a_graph.keep_out_edges[6]=True
+        # a_graph.keep_out_edges[7]=True
+
+        # print("\n\nTest: Find controllers from coord(2, 2) to cell 12")
+        # for p in a_graph.find_controllers_from_node_to_edge(2, 2, 12, True, True):
+        #     print(p)
+
+        exit()
+
+                
         self.obs = self.env.reset() # Get the first minigrid state
 
     def dummy_hl_controller(self, cell_idx): # add input start intersection (entry or exit condition)
@@ -297,7 +440,10 @@ class MinimalPublisher(Node):
                 
                 # Do not visit the same cell again
                 for controller_idx in hl_controller_idx_list:
-                    if math.floor(controller_idx/2) not in self.visited_cell_idxs: self.visited_cell_idxs.append(math.floor(controller_idx/2))
+                    cell_id = math.floor(controller_idx/2)
+                    if cell_id not in self.visited_cell_idxs:
+                        self.visited_cell_idxs.append(cell_id)
+                        self.mission.cells[cell_id].visited = True
                 print("Visited Cells:", self.visited_cell_idxs)
                 
                 # Only go upto the penultimate cell if a KOZ is in the last cell

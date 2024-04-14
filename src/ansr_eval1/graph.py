@@ -39,9 +39,11 @@ class Node:
         self._id = id
         self._point = point
 
-    def __init__(self, infile):
-        self._id, x, y = infile.readline().split()
-        self._point = Point(int(x), int(y))
+    @classmethod
+    def from_file(cls, infile):
+        id, x, y = infile.readline().split()
+        point = Point(int(x), int(y))
+        return cls(id,point)
 
     def get_id(self):
         return self._id
@@ -154,7 +156,7 @@ class Graph:
         self.keep_out_edges.clear()
 
     def read_node(self, infile):
-        return Node(infile)
+        return Node.from_file(infile)
 
     def read_edge(self, infile):
         return Edge.from_file(infile, self.id_to_node)
@@ -180,7 +182,7 @@ class Graph:
         return [n.get_node2().get_id() for n in self.id_to_edges[node]]
     
     # TODO: Integrate and test.
-    def set_data(self, mission, controllers):
+    def set_data(self, mission: Mission, controllers: list[MiniGridController]):
         """
         Read graph from Mission object and list of controllers
         and populate nodes, edges and keep_out_zone.
@@ -198,8 +200,10 @@ class Graph:
             fin_state = controller.get_final_states()
             assert(len(init_state) == 1)
             assert(len(fin_state) == 1)
-            initial_states.add(init_state)
-            final_states.add(fin_state)
+            p1 = Point(init_state[0][0], init_state[0][1])
+            p2 = Point(fin_state[0][0], fin_state[0][1])
+            initial_states.add(p1) 
+            final_states.add(p2)
             #TODO: check data types
 
         # Populate nodes
@@ -224,8 +228,8 @@ class Graph:
             fin_state = controller.get_final_states()
             assert(len(init_state) == 1)
             assert(len(fin_state) == 1)
-            w, x = init_state[0].x, init_state[0].y
-            y, z = fin_state[0].x, fin_state[0].y
+            w, x = init_state[0][0], init_state[0][1]
+            y, z = fin_state[0][0], fin_state[0][1]
             n1 = self.coord_to_node[w, x]
             n2 = self.coord_to_node[y, z]
             e = Edge(n1, n2)
@@ -242,7 +246,7 @@ class Graph:
 
         # Determine keep out zones cells (i.e. edges)
         self.keep_out_edges = []
-        assert(len(mission.cells) == (len(self.n_edges)/2))
+        assert(len(mission.cells) == self.n_edges/2)
         for c in mission.cells:
             self.keep_out_edges.append(c.in_keep_out_zone)
             self.keep_out_edges.append(c.in_keep_out_zone)
@@ -459,8 +463,21 @@ class Graph:
 
     def find_controllers_from_node_to_edge(self, x: int, y: int, cell_id: int, prune_koe=False, include_last=False):
         node = self.get_node_from_point((x, y))
+        # node.print()
         edge = self.edges[cell_id*2]
+        # edge.print()
         path = self.find_paths_to_cell(node.get_id(), edge.get_node1().get_id(), edge.get_node2().get_id())
+        # for p in path:
+        #     print(p)
+        return self.convert_to_controllers(path, prune_koe, include_last)
+    
+    def find_controllers_from_node_to_node(self, w: int, x: int, y: int, z: int, prune_koe=False, include_last=False):
+        node1 = self.get_node_from_point((w, x))
+        node2 = self.get_node_from_point((y, z))
+        # node.print()
+        path = self.find_paths(node1.get_id(), node2.get_id())
+        # for p in path:
+        #     print(p)
         return self.convert_to_controllers(path, prune_koe, include_last)
 
     def locate_nearest_node(self, p: Point):
