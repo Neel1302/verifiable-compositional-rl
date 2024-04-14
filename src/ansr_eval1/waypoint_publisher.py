@@ -212,6 +212,15 @@ class MinimalPublisher(Node):
             if os.path.isdir(controller_load_path):
                 controller = MiniGridController(0, load_dir=controller_load_path)
                 self.controller_list.append(controller)
+        
+        # re-order the controllers by index in ascending order
+        reordered_list = []
+        for i in range(len(self.controller_list)):
+            for controller in self.controller_list:
+                if controller.controller_ind == i:
+                    reordered_list.append(controller)
+        
+        self.controller_list = reordered_list
 
         # Initialize graph structure (for computing paths) with mission and controller list data
         self.mission.graph = Graph()
@@ -323,8 +332,19 @@ class MinimalPublisher(Node):
         # a_graph.keep_out_edges[6]=False
         # a_graph.keep_out_edges[7]=False
             
-        print("\n\nTest: Find controllers from coord(2, 2) to cell 12")
-        for p in a_graph.find_controllers_from_node_to_edge(2, 2, 12, True, True):
+        # print("\n\nTest: Find controllers from coord(12, 6) to cell 9")
+        # for p in a_graph.find_controllers_from_node_to_edge(12, 6, 9, False, True):
+        #     print(p)
+
+        # for p in a_graph.find_controllers_from_node_to_edge(12, 6, 9, True, True):
+        #     print(p)
+
+        print("\n\nTest: Find controllers from coord(12, 6) to coord(12, 12)")
+        for p in a_graph.find_controllers_from_node_to_node(12, 6, 12, 12, False, True):
+            print(p)
+
+        print("\n\nTest: Find controllers from coord(12, 6) to coord(12, 12)")
+        for p in a_graph.find_controllers_from_node_to_node(12, 6, 12, 12, True, True):
             print(p)
 
         # print("\n\nTest: Adding controllers 6, 7, 16 and 17 to the list of keep out edges")
@@ -420,7 +440,10 @@ class MinimalPublisher(Node):
                 
                 # Do not visit the same cell again
                 for controller_idx in hl_controller_idx_list:
-                    if math.floor(controller_idx/2) not in self.visited_cell_idxs: self.visited_cell_idxs.append(math.floor(controller_idx/2))
+                    cell_id = math.floor(controller_idx/2)
+                    if cell_id not in self.visited_cell_idxs:
+                        self.visited_cell_idxs.append(cell_id)
+                        self.mission.cells[cell_id].visited = True
                 print("Visited Cells:", self.visited_cell_idxs)
                 
                 # Only go upto the penultimate cell if a KOZ is in the last cell

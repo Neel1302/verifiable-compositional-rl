@@ -463,8 +463,21 @@ class Graph:
 
     def find_controllers_from_node_to_edge(self, x: int, y: int, cell_id: int, prune_koe=False, include_last=False):
         node = self.get_node_from_point((x, y))
+        # node.print()
         edge = self.edges[cell_id*2]
+        # edge.print()
         path = self.find_paths_to_cell(node.get_id(), edge.get_node1().get_id(), edge.get_node2().get_id())
+        # for p in path:
+        #     print(p)
+        return self.convert_to_controllers(path, prune_koe, include_last)
+    
+    def find_controllers_from_node_to_node(self, w: int, x: int, y: int, z: int, prune_koe=False, include_last=False):
+        node1 = self.get_node_from_point((w, x))
+        node2 = self.get_node_from_point((y, z))
+        # node.print()
+        path = self.find_paths(node1.get_id(), node2.get_id())
+        # for p in path:
+        #     print(p)
         return self.convert_to_controllers(path, prune_koe, include_last)
 
     def locate_nearest_node(self, p: Point):
