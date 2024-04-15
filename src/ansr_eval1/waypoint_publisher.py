@@ -72,7 +72,7 @@ class MinimalPublisher(Node):
         self.visited_cell_idxs = [] # Keeps track of visited cells
 
         # Load mission files
-        self.mission = Mission('../../../mission_briefing/description.json', '../../../mission_briefing/config.json')
+        self.mission = Mission('../../../mission_briefing/description2.json', '../../../mission_briefing/config.json')
 
         # Wait for the first ROS position message to arrive 
         while self.odom_msg == None:
@@ -265,13 +265,29 @@ class MinimalPublisher(Node):
         self.mission.graph.set_data(self.mission, self.controller_list)
 
         # Graph Tests
+        # for i in range(len(self.mission.graph.keep_out_edges)):
+        #     print(f"self.mission.graph.keep_out_edges[{i}] = {self.mission.graph.keep_out_edges[i]}")
+
         # print("\n\nTest: Find controllers from coord(12, 6) to coord(2,6)")
+        # print("prune_koe = False, include_last=False")
+        # for p in self.mission.graph.find_controllers_from_node_to_node(12, 6, 2, 6, False, False):
+        #     print(p)
+
+        # print("\n\nTest: Find controllers from coord(12, 6) to coord(2,6)")
+        # print("prune_koe = False, include_last=True")
+        # for p in self.mission.graph.find_controllers_from_node_to_node(12, 6, 2, 6, False, True):
+        #     print(p)
+
+        # print("\n\nTest: Find controllers from coord(12, 6) to coord(2,6)")
+        # print("prune_koe = True, include_last=False")
         # for p in self.mission.graph.find_controllers_from_node_to_node(12, 6, 2, 6, True, False):
         #     print(p)
 
         # print("\n\nTest: Find controllers from coord(12, 6) to coord(2,6)")
+        # print("prune_koe = True, include_last=True")
         # for p in self.mission.graph.find_controllers_from_node_to_node(12, 6, 2, 6, True, True):
         #     print(p)
+            
         # exit()
 
         # Move to first AirSim state that corresponds to a Minigrid state
@@ -493,7 +509,7 @@ class MinimalPublisher(Node):
                     # ------------------------------------------------------------------------------------------------ 
                     
                     # Once at entry to the target cell, check which controller has KOZ
-                    ret = self.traverse_koz_and_return(cell_idx)
+                    ret = self.traverse_koz_and_return(cell_idx, car)
                     if ret == False:
                         self.get_logger().info('Could not find target car {}'.format(car.id))
 

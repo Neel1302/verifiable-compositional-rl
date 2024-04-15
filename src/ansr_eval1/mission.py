@@ -313,7 +313,7 @@ if __name__ == "__main__":
         for area in mission.AOI_list:
             print('AOI ', area)
             x,y = area.exterior.xy
-            #plt.plot(x,y)
+            plt.plot(x,y, 'green')
 
         for car in mission.car_list:
             print(car.id)
@@ -323,7 +323,7 @@ if __name__ == "__main__":
                 print(region.polygon)
                 print('cells: ', region.cells)
                 x,y = region.polygon.exterior.xy
-                #plt.plot(x,y, 'yellow')
+                plt.plot(x,y, 'yellow')
 
         for zone in mission.keep_out_zones:
             print('Keep Out Zone', zone.polygon)
