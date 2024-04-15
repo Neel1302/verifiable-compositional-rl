@@ -106,8 +106,8 @@ class MinimalPublisher(Node):
             AOI_point_entry = self.mission.getSpecialAOIPointEntry(point)
             if AOI_point_entry is None: continue
 
-            airsim_state_entry = minigrid2airsim(AOI_point_entry)
-            airsim_state_AOI = minigrid2airsim(point)
+            airsim_state_entry = (AOI_point_entry[1], AOI_point_entry[0], 0)
+            airsim_state_AOI = (point[1], point[0], 0)
 
             state_list = self.get_navigation_state_list(current_state, airsim_state_entry)
             airsim_state_list.extend(state_list)
