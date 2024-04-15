@@ -271,7 +271,7 @@ class Mission:
                 x1 = x + dx
                 y1 = y + dy
                 points.append([x1,y1])
-                print(points)
+                #print(points)
                 linestring = LineString(points)
                 for zone in self.keep_out_zones:
                     if linestring.intersects(zone.polygon):
@@ -279,7 +279,7 @@ class Mission:
                         break
                 if intersect:
                     points.pop()
-                    print(points)
+                    #print(points)
                 else:
                     return [x1, y1]
         return None
@@ -307,7 +307,7 @@ class Mission:
         return None
 
 if __name__ == "__main__":
-        mission = Mission('../../../mission-schema/examples/Maneuver/RouteSearch/RSM002/description2.json', '../../../mission-schema/examples/Maneuver/RouteSearch/RSM002/config.json') 
+        mission = Mission('../../../mission-schema/examples/Maneuver/RouteSearch/RSM002/description.json', '../../../mission-schema/examples/Maneuver/RouteSearch/RSM002/config.json') 
         # mission = Mission('../../../mission-schema/examples/Maneuver/AreaSearch/ASM004/description.json', '../../../mission-schema/examples/Maneuver/AreaSearch/ASM004/config.json') 
 
         for area in mission.AOI_list:
@@ -351,6 +351,12 @@ if __name__ == "__main__":
                 #plt.plot(x,y)
 
         plt.show()
+
+        points = mission.getSpecialAOIPoints()
+        for point in points:
+            print('AOI point', point)
+            entry = mission.getSpecialAOIPointEntry(point)
+            print('Entry', entry)
 
         if (mission.mission_class == 'Route Search'):
             points = mission.route_list[0].points_list[0]
