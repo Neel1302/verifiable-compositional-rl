@@ -307,8 +307,8 @@ class Mission:
         return None
 
 if __name__ == "__main__":
-        #mission = Mission('../../../mission-schema/examples/Maneuver/RouteSearch/RSM002/description.json', '../../../mission-schema/examples/Maneuver/RouteSearch/RSM002/config.json') 
-        mission = Mission('../../../mission-schema/examples/Maneuver/AreaSearch/ASM004/description.json', '../../../mission-schema/examples/Maneuver/AreaSearch/ASM004/config.json') 
+        mission = Mission('../../../mission-schema/examples/Maneuver/RouteSearch/RSM002/description2.json', '../../../mission-schema/examples/Maneuver/RouteSearch/RSM002/config.json') 
+        # mission = Mission('../../../mission-schema/examples/Maneuver/AreaSearch/ASM004/description.json', '../../../mission-schema/examples/Maneuver/AreaSearch/ASM004/config.json') 
 
         for area in mission.AOI_list:
             print('AOI ', area)
@@ -323,14 +323,14 @@ if __name__ == "__main__":
                 print(region.polygon)
                 print('cells: ', region.cells)
                 x,y = region.polygon.exterior.xy
-                #plt.plot(x,y)
+                #plt.plot(x,y, 'yellow')
 
         for zone in mission.keep_out_zones:
             print('Keep Out Zone', zone.polygon)
             print("t_start \t", zone.t_start)
             print("t_end \t\t", zone.t_end)
             x,y = zone.polygon.exterior.xy
-            #plt.plot(x,y)
+            plt.plot(x,y, 'red')
 
         cell_idx = 0
         for cell in mission.cells:
@@ -338,7 +338,7 @@ if __name__ == "__main__":
             print('in_keep_out_zone \t', cell.in_keep_out_zone)
             print('in_any_region \t\t', cell.in_any_region)
             x,y = cell.polygon.exterior.xy
-            #plt.plot(x,y)
+            plt.plot(x,y, "black")
             cell_idx = cell_idx +1
 
         for route in mission.route_list:
@@ -350,7 +350,7 @@ if __name__ == "__main__":
                 x,y = rect.exterior.xy
                 #plt.plot(x,y)
 
-        #plt.show()
+        plt.show()
 
         if (mission.mission_class == 'Route Search'):
             points = mission.route_list[0].points_list[0]
