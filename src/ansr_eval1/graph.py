@@ -280,15 +280,14 @@ class Graph:
                 for key, value in self.id_to_node.items():
                     value.print()                    
 
-                for key, value in self.coord_to_node.items():
-                    print(key, end=": ")
-                    value.print()
+                # for key, value in self.coord_to_node.items():
+                #     print(key, end=": ")
+                #     value.print()
                 
                 line = infile.readline()
                 while line == '':
                     line = infile.readline()         
                 self.n_edges = int(line.split()[1])
-                print("\n\n# edges:", self.n_edges)
                 
                 for i in range(self.n_edges):
                     e = self.read_edge(infile)
@@ -303,14 +302,15 @@ class Graph:
                     self.coord_to_edge[y, z, w, x] = (e_rev, 2*i+1)
                 
                 self.n_edges *= 2
-                for i in range(self.n_edges):
-                    self.edges[i].print()
+                # for i in range(self.n_edges):
+                #     self.edges[i].print()
                 
+                print("\n\n# edges:", self.n_edges)
                 for k, v in self.coord_to_edge.items():
                     print(f"{v[1]}: {k}, ", end="")
                     v[0].print()
                 
-                self.keep_out_edges = [False] * (self.n_edges*2)
+                self.keep_out_edges = [False] * self.n_edges
 
                 # print("\n\nOutgoing edges:")
                 # for k, v in self.id_to_edges.items():
@@ -646,5 +646,41 @@ if __name__ == "__main__":
 
             print("\n\nTest: Find controllers from coord(2, 2) to cell 12")
             for p in a_graph.find_controllers_from_node_to_edge(2, 2, 12, True, True):
+                print(p)
+
+            print("\n\nTest: Adding controllers 6, 7, 22, 23, 24 and 25 to the list of keep out edges")
+            a_graph.keep_out_edges[6]=True
+            a_graph.keep_out_edges[7]=True
+            a_graph.keep_out_edges[16]=True
+            a_graph.keep_out_edges[17]=True
+            a_graph.keep_out_edges[18]=True
+            a_graph.keep_out_edges[19]=True
+            a_graph.keep_out_edges[20]=True
+            a_graph.keep_out_edges[21]=True
+            a_graph.keep_out_edges[22]=True
+            a_graph.keep_out_edges[23]=True
+            a_graph.keep_out_edges[24]=True
+            a_graph.keep_out_edges[25]=True
+            for i in range(len(a_graph.keep_out_edges)):
+                print(f"a_graph.keep_out_edges[{i}] = {a_graph.keep_out_edges[i]}")
+
+            print("\n\nTest: Find controllers from coord(12, 6) to coord(2,6)")
+            print("prune_koe = False, include_last=False")
+            for p in a_graph.find_controllers_from_node_to_node(12, 6, 2, 6, False, False):
+                print(p)
+
+            print("\n\nTest: Find controllers from coord(12, 6) to coord(2,6)")
+            print("prune_koe = False, include_last=True")
+            for p in a_graph.find_controllers_from_node_to_node(12, 6, 2, 6, False, True):
+                print(p)
+
+            print("\n\nTest: Find controllers from coord(12, 6) to coord(2,6)")
+            print("prune_koe = True, include_last=False")
+            for p in a_graph.find_controllers_from_node_to_node(12, 6, 2, 6, True, False):
+                print(p)
+
+            print("\n\nTest: Find controllers from coord(12, 6) to coord(2,6)")
+            print("prune_koe = True, include_last=True")
+            for p in a_graph.find_controllers_from_node_to_node(12, 6, 2, 6, True, True):
                 print(p)
 
