@@ -87,7 +87,7 @@ class Edge:
 
 class Koz:
     # Keep out zone;
-    # TODO: assuming convex polygon with edges listed cpointkwise
+    # assuming convex polygon with edges listed cpointkwise
     def __init__(self, infile, n_vertices):
         self.n_vertices = n_vertices
         self.vertices = []
@@ -141,6 +141,8 @@ class Graph:
         self.id_to_edges = {}
         self.id_to_paths = {}
         self.keep_out_edges = [] # T/F for each edge; T=> keep-out edge
+        self.mission = None
+        self.controllers = None
     
     def clear(self):
         self.n_nodes = 0
@@ -154,6 +156,8 @@ class Graph:
         self.id_to_edges.clear()
         self.id_to_paths.clear()
         self.keep_out_edges.clear()
+        self.mission = None
+        self.controllers = None
 
     def read_node(self, infile):
         return Node.from_file(infile)
@@ -181,7 +185,6 @@ class Graph:
     def get_neighboring_nodes(self, node: str):
         return [n.get_node2().get_id() for n in self.id_to_edges[node]]
     
-    # TODO: Integrate and test.
     def set_data(self, mission: Mission, controllers: list[MiniGridController]):
         """
         Read graph from Mission object and list of controllers
@@ -191,6 +194,9 @@ class Graph:
         """
         # Mission defines cells (i.e. edges)
         # Controllers are associated with initial and final states
+
+        self.mission = mission
+        self.controllers = controllers
         
         # Get vertices either from initial states
         initial_states = set()
@@ -204,12 +210,11 @@ class Graph:
             p2 = Point(fin_state[0][0], fin_state[0][1])
             initial_states.add(p1) 
             final_states.add(p2)
-            #TODO: check data types
 
         # Populate nodes
         self.n_nodes = len(initial_states)
         for i, pt in enumerate(initial_states):
-            n = Node(str(i), pt) #TODO: check type
+            n = Node(str(i), pt)
             self.nodes.append(n)
             self.id_to_node[n.get_id()] = n
             self.coord_to_node[n.get_point().x, n.get_point().y] = n
@@ -413,7 +418,28 @@ class Graph:
             for p in controller_paths:
                 if self.is_valid_controller_path(p, include_last):
                     pruned_controller_paths.append(p)
-            return pruned_controller_paths
+            controller_paths = pruned_controller_paths
+
+        # sort based on:
+        # (+) length of path
+        # (+) hops
+        # (-) length of cells that are of interest that have not been visited
+        # (-) length of cells that have not been visited * 0.5
+        if self.mission is not None:
+            sorted_controller_paths = []
+            for p in controller_paths:
+                distance = len(p)
+                for c in p:
+                    # for each controller/cell find its length
+                    cell = self.mission.cells[c//2]
+                    cell_length = self.edges[c].manhattan_distance()
+                    if cell.visited: # previously visited cell
+                        distance += cell_length
+                    elif not cell.in_any_region: # not visited cell but not in region of interest
+                        distance += cell_length//2
+                sorted_controller_paths.append((p, distance))
+            sorted_controller_paths.sort(key=lambda x: x[1])
+            controller_paths = [p for (p, dist) in sorted_controller_paths]
 
         return controller_paths
 
