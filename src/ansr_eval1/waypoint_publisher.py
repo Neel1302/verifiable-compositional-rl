@@ -123,12 +123,41 @@ class MinimalPublisher(Node):
         self.pub_waypoint(airsim_state_list)
 
     def get_navigation_state_list(self, source_state, target_state):
-        state_list = []
-        # TODO
-        state_list.append(source_state)
-        state_list.append(target_state)
+        obs_list = []
+        source_minigrid_state = airsim2minigrid(source_state)
+        target_minigrid_state = airsim2minigrid(target_state)
+        # Obtain a list of controllers yielding shortest path to cell of interest that does not intersect with any KOZ
+        hl_controller_idx_list = self.mission.graph.find_controllers_from_node_to_node(source_minigrid_state[0], source_minigrid_state[1], target_minigird_state[0], target_minigrid_state[1], True, True)
+        print("\nFind controllers from coord({}, {}) to coord({}, {})".format(source_minigrid_state[0], source_minigrid_state[1], target_minigrid_state[0], target_minigrid_state[1]))
+                
+        for p in hl_controller_idx_list:
+            print(p)
+        print("\n")
 
-        return state_list
+        if len(hl_controller_idx_list) > 0:
+            hl_controller_idx_list = hl_controller_idx_list[0]
+            hl_controller_list = self.get_controller_list(hl_controller_idx_list)
+
+            if len(hl_controller_idx_list) > 0:
+                # Execute controllers in minigrid and publish waypoints
+                # print("Init State: "+str(self.obs))
+                for controller in hl_controller_list:
+                    init = True
+                    # why need init?
+                    if init:
+                        # print("Final State: "+str(controller.get_final_states())+"\n")
+                        # print("** Using Controller **: "+str(controller.controller_ind)+"\n")
+                        init = False
+                    while (self.obs != controller.get_final_states()).any():
+                        action,_states = controller.predict(self.obs, deterministic=True)
+                        self.obs, reward, done, info = self.env.step(action)
+                        # print("Action: "+str(action))
+                        # print("Current State: "+str(self.obs))
+                        airsim_obs = minigrid2airsim(self.obs)
+                        # print("AirSim State: "+str(airsim_obs)+"\n")
+                        obs_list.append(airsim_obs)
+
+        return obs_list
 
     def look_around(self, state):
         state_list = []
@@ -424,7 +453,6 @@ class MinimalPublisher(Node):
                     print("\n")
 
                     # ------------------------------------------------------------------------------------------------
-            
                     if len(hl_controller_idx_list) == 0: continue # Skip if we have no path obtained
                     hl_controller_idx_list = hl_controller_idx_list[0]
                     hl_controller_list = self.get_controller_list(hl_controller_idx_list)
@@ -442,6 +470,7 @@ class MinimalPublisher(Node):
                             print("Current Minigrid State: {}, Final State: {}".format(current_minigrid_state, final_minigrid_state))   
                         
                         self.get_logger().info('Reached Target Cell...')
+            
                         if car.id in self.detected_entity_ids:
                             # self.pub_waypoint([self.mission.start_airsim_state]) # Need to think about and implement how we will get back to prevoius state.
                             return
