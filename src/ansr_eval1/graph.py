@@ -214,15 +214,15 @@ class Graph:
             self.id_to_node[n.get_id()] = n
             self.coord_to_node[n.get_point().x, n.get_point().y] = n
 
-        for key, value in self.id_to_node.items():
-            value.print()                    
-        for key, value in self.coord_to_node.items():
-            print(key, end=": ")
-            value.print()
+        # for key, value in self.id_to_node.items():
+        #     value.print()                    
+        # for key, value in self.coord_to_node.items():
+        #     # print(key, end=": ")
+        #     value.print()
         
         # Populate edges
         self.n_edges = len(controllers)
-        print("\n\n# edges:", self.n_edges)
+        # print("\n\n# edges:", self.n_edges)
         for i, controller in enumerate(controllers):
             init_state = controller.get_init_states()
             fin_state = controller.get_final_states()
@@ -238,11 +238,12 @@ class Graph:
             self.id_to_edges.setdefault(n1.get_id(), []).append(e)
             self.coord_to_edge[w, x, y, z] = (e, i)
         
-        for i in range(self.n_edges):
-            self.edges[i].print()
-        for k, v in self.coord_to_edge.items():
-            print(f"{v[1]}: {k}, ", end="")
-            v[0].print()
+        # for i in range(self.n_edges):
+            # self.edges[i].print()
+
+        # for k, v in self.coord_to_edge.items():
+            # print(f"{v[1]}: {k}, ", end="")
+            # v[0].print()
 
         # Determine keep out zones cells (i.e. edges)
         self.keep_out_edges = []
