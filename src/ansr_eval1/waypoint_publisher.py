@@ -85,12 +85,13 @@ class MinimalPublisher(Node):
         
         # Start appropriate mission
         if self.mission.mission_class == "Area Search":
-            self.run_area_search_mission() # TODO: Uncomment this
+            self.run_area_search_mission()
             if not self.all_cars_detected():
                 self.run_special_aoi_search()
-            # self.run_special_aoi_search() # TODO: Remove this line
+            # self.run_special_aoi_search()
             print("\n\n\n")
             self.get_logger().info('Mission Ended...')
+            exit()
 
         elif self.mission.mission_class == "Route Search":
             self.run_area_search_mission() # Change to route search function
@@ -402,7 +403,7 @@ class MinimalPublisher(Node):
         self.pub_waypoint(target_airsim_position_list)
 
         # While moving to the nearest point to the KOZ keep track of detected entities
-        while (distance(current_airsim_point, nearest_point) > 30): # TODO: if the distance is set to 15, drone gets stuck at about 25m from KOZ
+        while (distance(current_airsim_point, nearest_point) > 20):
             rclpy.spin_once(self)
             print("Current Distance: ", distance(current_airsim_point, nearest_point))
             current_airsim_point = Point(self.e_airsim, self.n_airsim)
@@ -582,7 +583,7 @@ class MinimalPublisher(Node):
             pose_msg_array.append(pose_msg)
 
         waypoint_msg.path = pose_msg_array
-        waypoint_msg.velocity = 4.0
+        waypoint_msg.velocity = 7.0
         waypoint_msg.lookahead = -1.0
         waypoint_msg.adaptive_lookahead = 0.0
         # waypoint_msg.drive_train_type = "ForwardOnly"
@@ -590,38 +591,6 @@ class MinimalPublisher(Node):
 
         self.publisher_.publish(waypoint_msg)
         self.get_logger().info('Publishing Waypoints...')
-
-    # Dummy function: returns nearest minigrid state given airsim state
-    def dummy_nearest_minigrid_state(self, airsim_state):
-        minigrid_state = airsim2minigrid(airsim_state)
-        minigrid_state[2] = 0
-        # Enter Junaid's code here
-        return [22,2,0] # Change this
-
-    def dummy_hl_controller(self, cell_idx): # add input start intersection (entry or exit condition)
-        controller_list = []
-        if cell_idx == 0:
-            controller_list.extend([3,1])
-        if cell_idx == 1:
-            controller_list.extend([0,2])
-        if cell_idx == 2:
-            controller_list.extend([0,4])
-        if cell_idx == 3:
-            controller_list.append(7)
-        if cell_idx == 5:
-            controller_list.extend([8,12,11])
-        if cell_idx == 6:
-            controller_list.extend([10,13])
-        if cell_idx == 7:
-            controller_list.extend([10,14])
-        if cell_idx == 9:
-            controller_list.extend([15,18])
-        if cell_idx == 10:
-            controller_list.extend([22,21])
-        if cell_idx == 14:
-            controller_list.append(29)
-        return controller_list
-
 
 def main(args=None):
     rclpy.init(args=args)
