@@ -245,7 +245,7 @@ class Mission:
 
 
     def getSpecialAOIPoints(self):
-        points = ([64, 64], [-64, -64], [64, -64])
+        points = ([64.0, 64.0], [-64.0, -64.0], [64.0, -64.0])
         AOI_points = []
         for car in self.car_list:
             for region in car.map:
@@ -307,13 +307,13 @@ class Mission:
         return None
 
 if __name__ == "__main__":
-        mission = Mission('../../../mission-schema/examples/Maneuver/RouteSearch/RSM002/description.json', '../../../mission-schema/examples/Maneuver/RouteSearch/RSM002/config.json') 
-        # mission = Mission('../../../mission-schema/examples/Maneuver/AreaSearch/ASM004/description.json', '../../../mission-schema/examples/Maneuver/AreaSearch/ASM004/config.json') 
+        # mission = Mission('../../../mission-schema/examples/Maneuver/RouteSearch/RSM002/description.json', '../../../mission-schema/examples/Maneuver/RouteSearch/RSM002/config.json') 
+        mission = Mission('../../../mission-schema/examples/Maneuver/AreaSearch/ASM004/description.json', '../../../mission-schema/examples/Maneuver/AreaSearch/ASM004/config.json') 
 
         for area in mission.AOI_list:
             print('AOI ', area)
             x,y = area.exterior.xy
-            plt.plot(x,y, 'green')
+            plt.plot(x,y, 'purple')
 
         for car in mission.car_list:
             print(car.id)
@@ -323,7 +323,7 @@ if __name__ == "__main__":
                 print(region.polygon)
                 print('cells: ', region.cells)
                 x,y = region.polygon.exterior.xy
-                plt.plot(x,y, 'yellow')
+                plt.plot(x,y, 'green')
 
         for zone in mission.keep_out_zones:
             print('Keep Out Zone', zone.polygon)

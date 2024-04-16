@@ -72,7 +72,7 @@ class MinimalPublisher(Node):
         self.visited_cell_idxs = [] # Keeps track of visited cells
 
         # Load mission files
-        self.mission = Mission('../../../mission_briefing/description2.json', '../../../mission_briefing/config.json')
+        self.mission = Mission('../../../mission_briefing/description.json', '../../../mission_briefing/config.json')
 
         # Wait for the first ROS position message to arrive 
         while self.odom_msg == None:
@@ -85,9 +85,12 @@ class MinimalPublisher(Node):
         
         # Start appropriate mission
         if self.mission.mission_class == "Area Search":
-            self.run_area_search_mission()
+            self.run_area_search_mission() # TODO: Uncomment this
             if not self.all_cars_detected():
                 self.run_special_aoi_search()
+            # self.run_special_aoi_search() # TODO: Remove this line
+            print("\n\n\n")
+            self.get_logger().info('Mission Ended...')
 
         elif self.mission.mission_class == "Route Search":
             self.run_area_search_mission() # Change to route search function
@@ -99,15 +102,16 @@ class MinimalPublisher(Node):
         return True
 
     def run_special_aoi_search(self):
+        self.get_logger().info('Performing Special AOI Search...')
         AOI_points = self.mission.getSpecialAOIPoints()
-        current_state = (self.n_airsim, self.e_airsim, 0)
+        current_state = [self.n_airsim, self.e_airsim, 0]
         for point in AOI_points:
             airsim_state_list = []
             AOI_point_entry = self.mission.getSpecialAOIPointEntry(point)
             if AOI_point_entry is None: continue
 
-            airsim_state_entry = (AOI_point_entry[1], AOI_point_entry[0], 0)
-            airsim_state_AOI = (point[1], point[0], 0)
+            airsim_state_entry = [AOI_point_entry[1], AOI_point_entry[0], 0]
+            airsim_state_AOI = [point[1], point[0], 0]
 
             state_list = self.get_navigation_state_list(current_state, airsim_state_entry)
             airsim_state_list.extend(state_list)
@@ -115,11 +119,15 @@ class MinimalPublisher(Node):
             airsim_state_list.append(airsim_state_AOI)
 
             state_list = self.look_around(airsim_state_AOI)
+            print(airsim_state_list)
+            print(state_list)
             airsim_state_list.extend(state_list)
+            print(airsim_state_list)
 
             airsim_state_list.append(airsim_state_entry)
             current_state = airsim_state_entry
-            
+
+        print("AOI Waypoints: ", airsim_state_list)    
         self.pub_waypoint(airsim_state_list)
 
     def get_navigation_state_list(self, source_state, target_state):
@@ -127,7 +135,7 @@ class MinimalPublisher(Node):
         source_minigrid_state = airsim2minigrid(source_state)
         target_minigrid_state = airsim2minigrid(target_state)
         # Obtain a list of controllers yielding shortest path to cell of interest that does not intersect with any KOZ
-        hl_controller_idx_list = self.mission.graph.find_controllers_from_node_to_node(source_minigrid_state[0], source_minigrid_state[1], target_minigird_state[0], target_minigrid_state[1], True, True)
+        hl_controller_idx_list = self.mission.graph.find_controllers_from_node_to_node(source_minigrid_state[0], source_minigrid_state[1], target_minigrid_state[0], target_minigrid_state[1], True, True)
         print("\nFind controllers from coord({}, {}) to coord({}, {})".format(source_minigrid_state[0], source_minigrid_state[1], target_minigrid_state[0], target_minigrid_state[1]))
                 
         for p in hl_controller_idx_list:
@@ -161,19 +169,29 @@ class MinimalPublisher(Node):
 
     def look_around(self, state):
         state_list = []
-        delta = 1
+        delta = 5.0
 
-        state[0] = state[0] + delta
-        state_list.append(state)
+        print(state, state[0], state[0] + delta)
 
-        state[1] = state[1] + delta
-        state_list.append(state)
+        state1 = [state[0] + delta, state[1], 0]
+        state_list.append(state1)
 
-        state[0] = state[0] - delta
-        state_list.append(state)
+        print(state_list)
 
-        state[1] = state[1] - delta
-        state_list.append(state)
+        state2 = [state[0] + delta, state[1] + delta, 0]
+        state_list.append(state2)
+
+        print(state_list)
+
+        state3 = [state[0], state[1] + delta, 0]
+        state_list.append(state3)
+
+        print(state_list)
+
+        state4 = [state[0], state[1], 0]
+        state_list.append(state4)
+
+        print(state_list)
 
         return state_list
 
@@ -358,19 +376,27 @@ class MinimalPublisher(Node):
                 obs_list.append(airsim_obs)
         self.pub_waypoint(obs_list)
 
-    def traverse_koz_and_return(self, cell_idx, car):
-        self.init_airsim_position = [self.n_airsim, self.e_airsim, 0]
-        self.init_minigrid_state = airsim2minigrid(self.init_airsim_position)
-        self.init_airsim_point = Point(self.e_airsim, self.n_airsim)
+    def traverse_koz_and_return(self, cell_idx, car, target_controller, done_one_end):
+        if not done_one_end:
+            minigrid_x, minigrid_y, _ = target_controller.get_init_states()[0]
+        else:
+            minigrid_x, minigrid_y, _ = target_controller.get_final_states()[0]
+        self.init_minigrid_state = [minigrid_x, minigrid_y, 0]
+        self.init_airsim_position = minigrid2airsim(self.init_minigrid_state)
+        self.init_airsim_point = Point(self.init_airsim_position[1], self.init_airsim_position[0])
         current_airsim_point = Point(self.e_airsim, self.n_airsim)
         koz = self.mission.cells[cell_idx].keep_out_zone
-        print("KOZ and current airsim point: ",koz.polygon, current_airsim_point)
-        nearest_point, _ = nearest_points(koz.polygon, current_airsim_point)
+        print("KOZ and initial airsim point: ",koz.polygon, self.init_airsim_point)
+        nearest_point, _ = nearest_points(koz.polygon, self.init_airsim_point)
         target_airsim_position = [nearest_point.y, nearest_point.x, 0]
         mid_airsim_position = [(target_airsim_position[0]+self.init_airsim_position[0])/2, (target_airsim_position[1]+self.init_airsim_position[1])/2, 0]
+        mid_airsim_point = Point(mid_airsim_position[1], mid_airsim_position[0])
         
-        target_airsim_position_list = [mid_airsim_position, target_airsim_position]
-        print(target_airsim_position_list)
+        if (distance(mid_airsim_point, nearest_point) > 30):
+            target_airsim_position_list = [mid_airsim_position, target_airsim_position]
+        else:
+            target_airsim_position_list = [target_airsim_position]
+        print("Target waypoints: ", target_airsim_position_list)
         print("Nearest AirSim Position to KOZ: "+str(nearest_point))
         self.get_logger().info('Moving to One End of KOZ...')
         self.pub_waypoint(target_airsim_position_list)
@@ -387,9 +413,12 @@ class MinimalPublisher(Node):
         # Return back to entry of the last cell
         current_airsim_position = [current_airsim_point.y, current_airsim_point.x, 0]
         current_minigrid_state = airsim2minigrid(current_airsim_position)
-        mid_airsim_position = [(current_airsim_position[0]+self.init_airsim_position[0])/2, (current_airsim_position[1]+self.init_airsim_position[1])/2, 0]
         
-        target_airsim_position_list = [mid_airsim_position, self.init_airsim_position]
+        if (distance(mid_airsim_point, nearest_point) > 30):
+            target_airsim_position_list = [mid_airsim_position, self.init_airsim_position]
+        else:
+            target_airsim_position_list = [self.init_airsim_position]
+        print("Target waypoints: ", target_airsim_position_list)
         self.get_logger().info('Returning to Initial AirSim Position...')
         self.pub_waypoint(target_airsim_position_list)
         print("Moving back to initial position: "+str(self.init_airsim_position))
@@ -467,7 +496,7 @@ class MinimalPublisher(Node):
                 
                 # Once at entry to the target cell, check which controller has KOZ
                 if self.mission.cells[cell_idx].in_keep_out_zone:
-                    ret = self.traverse_koz_and_return(cell_idx, car)
+                    ret = self.traverse_koz_and_return(cell_idx, car, target_controller, False)
                     if ret == True: return
 
                     self.get_logger().info('Could not find target car; moving to other end of KOZ...')
@@ -489,6 +518,8 @@ class MinimalPublisher(Node):
                     hl_controller_idx_list = hl_controller_idx_list[0]
                     hl_controller_list = self.get_controller_list(hl_controller_idx_list)
 
+                    target_controller = hl_controller_list[-1]
+
                     if len(hl_controller_idx_list) != 0:
                         self.get_logger().info('Moving to Next Cell...')
                         # Execute controllers in minigrid and publish waypoints
@@ -509,9 +540,11 @@ class MinimalPublisher(Node):
                     # ------------------------------------------------------------------------------------------------ 
                     
                     # Once at entry to the target cell, check which controller has KOZ
-                    ret = self.traverse_koz_and_return(cell_idx, car)
-                    if ret == False:
-                        self.get_logger().info('Could not find target car {}'.format(car.id))
+                    ret = self.traverse_koz_and_return(cell_idx, car, target_controller, True)
+                    if ret == True:
+                        self.get_logger().info('Found target car {}'.format(car.id))
+                        return
+                    else: self.get_logger().info('Could not find target car {}'.format(car.id))
 
                 
     def pub_waypoint(self, obs_list):
@@ -549,7 +582,7 @@ class MinimalPublisher(Node):
             pose_msg_array.append(pose_msg)
 
         waypoint_msg.path = pose_msg_array
-        waypoint_msg.velocity = 5.0
+        waypoint_msg.velocity = 4.0
         waypoint_msg.lookahead = -1.0
         waypoint_msg.adaptive_lookahead = 0.0
         # waypoint_msg.drive_train_type = "ForwardOnly"

@@ -436,7 +436,9 @@ class Graph:
                     if cell.visited: # previously visited cell
                         distance += cell_length
                     elif not cell.in_any_region: # not visited cell but not in region of interest
-                        distance += cell_length//2
+                        distance += cell_length*2//3
+                    else:
+                        distance += cell_length*1//3
                 sorted_controller_paths.append((p, distance))
             sorted_controller_paths.sort(key=lambda x: x[1])
             controller_paths = [p for (p, dist) in sorted_controller_paths]
