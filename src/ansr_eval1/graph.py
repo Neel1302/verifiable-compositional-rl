@@ -5,7 +5,8 @@
 from mission import Mission
 
 import sys
-sys.path.append('..')
+import getpass
+sys.path.append('/home/{}/dev_ws/src/verifiable-compositional-rl/src/'.format(getpass.getuser()))
 from Controllers.minigrid_controller import MiniGridController
 
 from collections import namedtuple

@@ -288,7 +288,7 @@ class Mission:
         # TODO
         points_list = route.points_list[0]
         route_points = points_list[:]
-        sorted_route_points = sort_points_by_distance(route_points, source)
+        sorted_route_points = sort_points_by_distance(route_points, source_point)
 
         points = []
         points.append(source_point)
@@ -305,10 +305,48 @@ class Mission:
                 else:
                     return route_point
         return None
+    
+    def interpolate_route_waypoints(self, route):
+        interpolated_waypoint_list= []
+        points_list = route.points_list[0]
+        for route_point in points_list:
+            waypoint = [route_point[0], route_point[1]] 
+            interpolated_waypoint_list.append(waypoint)
+        return interpolated_waypoint_list
+
+    def get_route_waypoint_list(self, route_point_list, route_entry):
+        route_waypoint_list = []
+        head_list = []
+        for waypoint in route_point_list:
+            print(waypoint)
+            if  waypoint != route_entry:
+                head_list.append(waypoint)
+            else:
+                break
+
+        #print('head', head_list)
+        tail_list = [item for item in route_point_list if item not in head_list]
+        #print('tail', tail_list)
+
+        head_list_reverse = head_list[:]
+        head_list_reverse.reverse()
+
+        tail_list_reverse = tail_list[:]
+        tail_list_reverse.reverse()
+
+        head_list.pop(0)
+        tail_list_reverse.pop(0)
+
+        route_waypoint_list.extend(tail_list)
+        route_waypoint_list.extend(tail_list_reverse)
+        route_waypoint_list.extend(head_list_reverse)
+        route_waypoint_list.extend(head_list)
+
+        return route_waypoint_list
 
 if __name__ == "__main__":
-        # mission = Mission('../../../mission-schema/examples/Maneuver/RouteSearch/RSM002/description.json', '../../../mission-schema/examples/Maneuver/RouteSearch/RSM002/config.json') 
-        mission = Mission('../../../mission-schema/examples/Maneuver/AreaSearch/ASM004/description.json', '../../../mission-schema/examples/Maneuver/AreaSearch/ASM004/config.json') 
+        mission = Mission('../../../mission-schema/examples/Maneuver/RouteSearch/RSM002/description.json', '../../../mission-schema/examples/Maneuver/RouteSearch/RSM002/config.json') 
+        # mission = Mission('../../../mission-schema/examples/Maneuver/AreaSearch/ASM004/description.json', '../../../mission-schema/examples/Maneuver/AreaSearch/ASM004/config.json') 
 
         for area in mission.AOI_list:
             print('AOI ', area)
@@ -344,7 +382,7 @@ if __name__ == "__main__":
         for route in mission.route_list:
             for points in route.points_list:
                 linestring = LineString(points)
-                #plt.plot(*linestring.xy,  linewidth=7.0)
+                plt.plot(*linestring.xy,  linewidth=7.0, color="blue")
 
             for rect in route.rectangles:
                 x,y = rect.exterior.xy

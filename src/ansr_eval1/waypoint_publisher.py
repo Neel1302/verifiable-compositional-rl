@@ -3,6 +3,7 @@ from rclpy.node import Node
 
 from std_msgs.msg import String
 from std_msgs.msg import Header
+from std_msgs.msg import Empty
 from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import Odometry
 from adk_node.msg import WaypointPath
@@ -24,9 +25,11 @@ from shapely.geometry import Polygon, Point, LineString
 from shapely.ops import nearest_points
 from shapely import distance
 
-# Run the labyrinth navigation experiment.
-''' Conventions
+import getpass
 
+'''
+Conventions
+--------------
 Directions:
 ----------
 0 = right
@@ -45,7 +48,9 @@ forward = 2
 # %%
 import os, sys
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
-sys.path.append('..')
+base_path = '/home/{}/dev_ws/src'.format(getpass.getuser())
+os.chdir(base_path)
+sys.path.append('verifiable-compositional-rl/src')
 
 from Environments.minigrid_labyrinth import Maze
 import numpy as np
@@ -58,13 +63,14 @@ from MDP.high_level_mdp import HLMDP
 from utils.results_saver import Results
 import time
 
-class MinimalPublisher(Node):
+class Mission_Exec(Node):
 
     def __init__(self):
-        super().__init__('sparse_waypoint_publisher')
+        super().__init__('waypoint_publisher')
         # ROS publishers and subscribers
         qos_profile = QoSProfile(depth=1,reliability=QoSReliabilityPolicy.RELIABLE,durability=QoSDurabilityPolicy.TRANSIENT_LOCAL) # Require special QOS for this message
-        self.publisher_ = self.create_publisher(WaypointPath, 'adk_node/input/waypoints', qos_profile) # Waypoint topic for ROS2 API controller
+        self.waypoint_publisher = self.create_publisher(WaypointPath, 'adk_node/input/waypoints', qos_profile) # Waypoint topic for ROS2 API controller
+        self.sim_termination_publisher = self.create_publisher(Empty, 'adk_node/input/terminate', qos_profile) # Waypoint topic for ROS2 API controller
         self.create_subscription(TargetPerception, 'adk_node/ground_truth/perception', self.gt_perception_callback, 10) # Ground truth perception topic
         self.create_subscription(Odometry, 'adk_node/SimpleFlight/odom_local_ned', self.odom_callback, 10) # Position topic (NED frame)
         self.odom_msg = None
@@ -72,7 +78,7 @@ class MinimalPublisher(Node):
         self.visited_cell_idxs = [] # Keeps track of visited cells
 
         # Load mission files
-        self.mission = Mission('../../../mission_briefing/description.json', '../../../mission_briefing/config.json')
+        self.mission = Mission(os.path.join(base_path, 'mission_briefing/description.json'), os.path.join(base_path, 'mission_briefing/config.json'))
 
         # Wait for the first ROS position message to arrive 
         while self.odom_msg == None:
@@ -89,12 +95,45 @@ class MinimalPublisher(Node):
             if not self.all_cars_detected():
                 self.run_special_aoi_search()
             # self.run_special_aoi_search()
-            print("\n\n\n")
-            self.get_logger().info('Mission Ended...')
+            self.get_logger().info("\n\n\n")
+            self.get_logger().info('Area Search Mission Ended...')
+            self.sim_termination_publisher.publish(Empty())
             exit()
 
         elif self.mission.mission_class == "Route Search":
-            self.run_area_search_mission() # Change to route search function
+            self.run_route_search_mission()
+            self.get_logger().info("\n\n\n")
+            self.get_logger().info('Route Search Mission Ended...')
+            self.sim_termination_publisher.publish(Empty())
+            exit()
+
+    def run_route_search_mission(self):
+        self.get_logger().info("\n\n\n")
+        self.get_logger().info('Route Search Mission Begins...')
+        # self.get_logger().info("\n\n\n")
+        airsim_waypoint_list = []
+        waypoint_list = []
+
+        # assume signle route
+        interpolated_waypoint_list = self.mission.interpolate_route_waypoints(self.mission.route_list[0])
+
+        current_airsim_point = [self.e_airsim, self.n_airsim]
+        route_entry = self.mission.getRouteEntry(self.mission.route_list[0], current_airsim_point)    
+        route_waypoint_list = self.mission.get_route_waypoint_list(interpolated_waypoint_list, route_entry)
+
+        for waypoint in route_waypoint_list:
+            airsim_waypoint_list.append([waypoint[1], waypoint[0], 0])
+
+        for i in range(100):
+            waypoint_list.extend(airsim_waypoint_list)
+
+        self.pub_waypoint(waypoint_list)
+
+        while not self.all_cars_detected():
+            rclpy.spin_once(self)
+
+        self.pub_waypoint([[self.n_airsim, self.e_airsim, 0]])
+        return
 
     def all_cars_detected(self):
         for car in self.mission.car_list:
@@ -120,15 +159,15 @@ class MinimalPublisher(Node):
             airsim_state_list.append(airsim_state_AOI)
 
             state_list = self.look_around(airsim_state_AOI)
-            print(airsim_state_list)
-            print(state_list)
+            #print(airsim_state_list)
+            #print(state_list)
             airsim_state_list.extend(state_list)
-            print(airsim_state_list)
+            #print(airsim_state_list)
 
             airsim_state_list.append(airsim_state_entry)
             current_state = airsim_state_entry
 
-        print("AOI Waypoints: ", airsim_state_list)    
+        #print("AOI Waypoints: ", airsim_state_list)    
         self.pub_waypoint(airsim_state_list)
 
     def get_navigation_state_list(self, source_state, target_state):
@@ -137,11 +176,11 @@ class MinimalPublisher(Node):
         target_minigrid_state = airsim2minigrid(target_state)
         # Obtain a list of controllers yielding shortest path to cell of interest that does not intersect with any KOZ
         hl_controller_idx_list = self.mission.graph.find_controllers_from_node_to_node(source_minigrid_state[0], source_minigrid_state[1], target_minigrid_state[0], target_minigrid_state[1], True, True)
-        print("\nFind controllers from coord({}, {}) to coord({}, {})".format(source_minigrid_state[0], source_minigrid_state[1], target_minigrid_state[0], target_minigrid_state[1]))
+        #print("\nFind controllers from coord({}, {}) to coord({}, {})".format(source_minigrid_state[0], source_minigrid_state[1], target_minigrid_state[0], target_minigrid_state[1]))
                 
-        for p in hl_controller_idx_list:
-            print(p)
-        print("\n")
+        #for p in hl_controller_idx_list:
+        #    print(p)
+        #print("\n")
 
         if len(hl_controller_idx_list) > 0:
             hl_controller_idx_list = hl_controller_idx_list[0]
@@ -172,27 +211,27 @@ class MinimalPublisher(Node):
         state_list = []
         delta = 5.0
 
-        print(state, state[0], state[0] + delta)
+        #print(state, state[0], state[0] + delta)
 
         state1 = [state[0] + delta, state[1], 0]
         state_list.append(state1)
 
-        print(state_list)
+        #print(state_list)
 
         state2 = [state[0] + delta, state[1] + delta, 0]
         state_list.append(state2)
 
-        print(state_list)
+        #print(state_list)
 
         state3 = [state[0], state[1] + delta, 0]
         state_list.append(state3)
 
-        print(state_list)
+        #print(state_list)
 
         state4 = [state[0], state[1], 0]
         state_list.append(state4)
 
-        print(state_list)
+        #print(state_list)
 
         return state_list
 
@@ -206,7 +245,7 @@ class MinimalPublisher(Node):
         self.odom_msg = odom_msg
         self.n_airsim = odom_msg.pose.pose.position.x
         self.e_airsim = odom_msg.pose.pose.position.y
-        print("Current AirSim State: {}".format([self.n_airsim, self.e_airsim, 0]))
+        #print("Current AirSim State: {}".format([self.n_airsim, self.e_airsim, 0]))
 
     def sort_points_by_distance(self, points, source):
             #points.sort(key = lambda p: (p.x - x)**2 + (p.y - y)**2)
@@ -243,7 +282,7 @@ class MinimalPublisher(Node):
                     points.pop()
                 else:
                     e, n = node
-                    print("Nearest AirSim Entry State: ", [n, e, 0])
+                    #print("Nearest AirSim Entry State: ", [n, e, 0])
                     return [n, e, 0]
         return None
 
@@ -252,11 +291,8 @@ class MinimalPublisher(Node):
         # Load minigrid controllers
         load_folder_name = '2024-04-01_17-26-42_minigrid_labyrinth'
 
-        base_path = os.path.abspath(os.path.curdir)
-        string_ind = base_path.find('src')
-        assert(string_ind >= 0)
-        base_path = base_path[0:string_ind + 4]
-        base_path = os.path.join(base_path, 'verifiable-compositional-rl/src/data', 'saved_controllers')
+        base_path = '/home/{}/dev_ws/src'.format(getpass.getuser())
+        base_path = os.path.join(base_path, 'verifiable-compositional-rl/src/data/saved_controllers')
         load_dir = os.path.join(base_path, load_folder_name)
 
         self.controller_list = []
@@ -273,11 +309,7 @@ class MinimalPublisher(Node):
                 if controller.controller_ind == i:
                     reordered_list.append(controller)
         
-        self.controller_list = reordered_list
-        
-        print("\n\n\n")
-        self.get_logger().info('Mission Begins...')
-        print("\n\n\n")
+        self.controller_list = reordered_list        
 
         # Initialize graph structure (for computing paths) with mission and controller list data
         self.mission.graph = Graph()
@@ -312,33 +344,38 @@ class MinimalPublisher(Node):
         # Move to first AirSim state that corresponds to a Minigrid state
         # ------------------------------------------------------------------------------------------------
 
-        # Get the nearest minigrid entry state of the first controller
-        current_airsim_state = [self.n_airsim, self.e_airsim, 0]
-        self.mission.start_airsim_state = self.get_nearest_entry(current_airsim_state)
-        self.mission.start_minigrid_state = airsim2minigrid(self.mission.start_airsim_state) # Get the airsim state for the entry state of the first controller
+        if self.mission.mission_class == "Area Search":
+            self.get_logger().info("\n\n\n")
+            self.get_logger().info('Area Search Mission Begins...')
+            # self.get_logger().info("\n\n\n")
 
-        # Move to entry state of the first controller
-        self.get_logger().info('Moving to Initial Entry Position...')
-        self.pub_waypoint([self.mission.start_airsim_state])
+            # Get the nearest minigrid entry state of the first controller
+            current_airsim_state = [self.n_airsim, self.e_airsim, 0]
+            self.mission.start_airsim_state = self.get_nearest_entry(current_airsim_state)
+            self.mission.start_minigrid_state = airsim2minigrid(self.mission.start_airsim_state) # Get the airsim state for the entry state of the first controller
 
-        # Check if the drone reached entry state of the first controller
-        current_minigrid_state = airsim2minigrid((self.n_airsim, self.e_airsim, 0))
-        final_minigrid_state = self.mission.start_minigrid_state
-        while (current_minigrid_state != final_minigrid_state):
-            rclpy.spin_once(self)
+            # Move to entry state of the first controller
+            self.get_logger().info('Moving to Initial Entry Position...')
+            self.pub_waypoint([self.mission.start_airsim_state])
+
+            # Check if the drone reached entry state of the first controller
             current_minigrid_state = airsim2minigrid((self.n_airsim, self.e_airsim, 0))
-            print("Current State: {}, Final State: {}".format(current_minigrid_state, final_minigrid_state))
-        
-        self.get_logger().info('Reached Initial Entry Position...')
+            final_minigrid_state = self.mission.start_minigrid_state
+            while (current_minigrid_state != final_minigrid_state):
+                rclpy.spin_once(self)
+                current_minigrid_state = airsim2minigrid((self.n_airsim, self.e_airsim, 0))
+                #print("Current State: {}, Final State: {}".format(current_minigrid_state, final_minigrid_state))
+            
+            self.get_logger().info('Reached Initial Entry Position...')
 
 
-        env_settings = {
-            'agent_start_states' : [tuple(self.mission.start_minigrid_state)],
-            'slip_p' : 0.0,
-        }
+            env_settings = {
+                'agent_start_states' : [tuple(self.mission.start_minigrid_state)],
+                'slip_p' : 0.0,
+            }
 
-        self.env = Maze(**env_settings)
-        self.obs = self.env.reset() # Get the first minigrid state
+            self.env = Maze(**env_settings)
+            self.obs = self.env.reset() # Get the first minigrid state
 
     def run_area_search_mission(self):
         # Itereate through each car in the list of cars
@@ -387,7 +424,7 @@ class MinimalPublisher(Node):
         self.init_airsim_point = Point(self.init_airsim_position[1], self.init_airsim_position[0])
         current_airsim_point = Point(self.e_airsim, self.n_airsim)
         koz = self.mission.cells[cell_idx].keep_out_zone
-        print("KOZ and initial airsim point: ",koz.polygon, self.init_airsim_point)
+        #print("KOZ and initial airsim point: ",koz.polygon, self.init_airsim_point)
         nearest_point, _ = nearest_points(koz.polygon, self.init_airsim_point)
         target_airsim_position = [nearest_point.y, nearest_point.x, 0]
         mid_airsim_position = [(target_airsim_position[0]+self.init_airsim_position[0])/2, (target_airsim_position[1]+self.init_airsim_position[1])/2, 0]
@@ -397,17 +434,17 @@ class MinimalPublisher(Node):
             target_airsim_position_list = [mid_airsim_position, target_airsim_position]
         else:
             target_airsim_position_list = [target_airsim_position]
-        print("Target waypoints: ", target_airsim_position_list)
-        print("Nearest AirSim Position to KOZ: "+str(nearest_point))
+        #print("Target waypoints: ", target_airsim_position_list)
+        #print("Nearest AirSim Position to KOZ: "+str(nearest_point))
         self.get_logger().info('Moving to One End of KOZ...')
         self.pub_waypoint(target_airsim_position_list)
 
         # While moving to the nearest point to the KOZ keep track of detected entities
         while (distance(current_airsim_point, nearest_point) > 20):
             rclpy.spin_once(self)
-            print("Current Distance: ", distance(current_airsim_point, nearest_point))
+            #print("Current Distance: ", distance(current_airsim_point, nearest_point))
             current_airsim_point = Point(self.e_airsim, self.n_airsim)
-            print("Current AirSim Position: "+str(current_airsim_point))
+            #print("Current AirSim Position: "+str(current_airsim_point))
             if car.id in self.detected_entity_ids:
                 break
     
@@ -419,14 +456,14 @@ class MinimalPublisher(Node):
             target_airsim_position_list = [mid_airsim_position, self.init_airsim_position]
         else:
             target_airsim_position_list = [self.init_airsim_position]
-        print("Target waypoints: ", target_airsim_position_list)
+        #print("Target waypoints: ", target_airsim_position_list)
         self.get_logger().info('Returning to Initial AirSim Position...')
         self.pub_waypoint(target_airsim_position_list)
-        print("Moving back to initial position: "+str(self.init_airsim_position))
+        #print("Moving back to initial position: "+str(self.init_airsim_position))
         while ((current_minigrid_state != self.init_minigrid_state)):
             rclpy.spin_once(self)
             current_minigrid_state = airsim2minigrid((self.n_airsim, self.e_airsim, 0))
-            print("Current Minigrid State: {}, Final State: {}".format(current_minigrid_state, self.init_minigrid_state))
+            #print("Current Minigrid State: {}, Final State: {}".format(current_minigrid_state, self.init_minigrid_state))
         
         if car.id in self.detected_entity_ids:
             return True
@@ -437,8 +474,8 @@ class MinimalPublisher(Node):
         # Iterate through each region in AOI
         for region in car.map:
             print('Probability: ',region.probability)
-            print('Polygon: ', region.polygon)
-            print('Cells: ', region.cells)
+            #print('Polygon: ', region.polygon)
+            #print('Cells: ', region.cells)
             # Iterate through each cell that covers the region -> Plan how to get to one of the destination the cell states from current state
             for cell_idx in region.cells:
                 if cell_idx in self.visited_cell_idxs: continue # Skip if we already visited the cell
@@ -447,11 +484,11 @@ class MinimalPublisher(Node):
 
                 # Obtain a list of controllers yielding shortest path to cell of interest that does not intersect with any KOZ
                 hl_controller_idx_list = self.mission.graph.find_controllers_from_node_to_edge(current_minigrid_state[0], current_minigrid_state[1], cell_idx, True, True)
-                print("\nFind controllers from coord({}, {}) to cell {}".format(current_minigrid_state[0], current_minigrid_state[1], cell_idx))
+                #print("\nFind controllers from coord({}, {}) to cell {}".format(current_minigrid_state[0], current_minigrid_state[1], cell_idx))
                 
-                for p in hl_controller_idx_list:
-                    print(p)
-                print("\n")
+                #for p in hl_controller_idx_list:
+                #    print(p)
+                #print("\n")
 
                 # Move to a cell based on car priority and probability
                 # ------------------------------------------------------------------------------------------------
@@ -462,7 +499,7 @@ class MinimalPublisher(Node):
                 
                 # Only go upto the penultimate cell if a KOZ is in the last cell
                 if self.mission.cells[cell_idx].in_keep_out_zone:
-                    print("Cell {} is in KOZ and controller list is: {}".format(cell_idx, hl_controller_idx_list))
+                    #print("Cell {} is in KOZ and controller list is: {}".format(cell_idx, hl_controller_idx_list))
                     target_controller_idx = hl_controller_idx_list[-1]
                     target_controller = hl_controller_list[-1]
                     hl_controller_idx_list.pop()
@@ -474,7 +511,7 @@ class MinimalPublisher(Node):
                     if cell_id not in self.visited_cell_idxs:
                         self.visited_cell_idxs.append(cell_id)
                         self.mission.cells[cell_id].visited = True
-                print("Visited Cells:", self.visited_cell_idxs)
+                #print("Visited Cells:", self.visited_cell_idxs)
                 
                 if len(hl_controller_idx_list) != 0:
                     self.get_logger().info('Moving to Next Cell...')
@@ -486,7 +523,7 @@ class MinimalPublisher(Node):
                     while (current_minigrid_state != final_minigrid_state):
                         rclpy.spin_once(self)
                         current_minigrid_state = airsim2minigrid((self.n_airsim, self.e_airsim, 0))
-                        print("Current Minigrid State: {}, Final State: {}".format(current_minigrid_state, final_minigrid_state))   
+                        #print("Current Minigrid State: {}, Final State: {}".format(current_minigrid_state, final_minigrid_state))   
                     self.get_logger().info('Reached Target Cell...')
                     
                     if car.id in self.detected_entity_ids:
@@ -507,11 +544,11 @@ class MinimalPublisher(Node):
                     
                     other_end_minigrid_state = list(target_controller.get_final_states()[0])
                     hl_controller_idx_list = self.mission.graph.find_controllers_from_node_to_node(current_minigrid_state[0], current_minigrid_state[1], other_end_minigrid_state[0], other_end_minigrid_state[1], True, False)
-                    print("\nFind controllers from coord({}, {}) to coord({}, {})".format(current_minigrid_state[0], current_minigrid_state[1], other_end_minigrid_state[0], other_end_minigrid_state[1]))
+                    #print("\nFind controllers from coord({}, {}) to coord({}, {})".format(current_minigrid_state[0], current_minigrid_state[1], other_end_minigrid_state[0], other_end_minigrid_state[1]))
                     
-                    for p in hl_controller_idx_list:
-                        print(p)
-                    print("\n")
+                    #for p in hl_controller_idx_list:
+                    #    print(p)
+                    #print("\n")
 
                     # Moving to the other end of KOZ
                     # ------------------------------------------------------------------------------------------------
@@ -531,7 +568,7 @@ class MinimalPublisher(Node):
                         while (current_minigrid_state != final_minigrid_state):
                             rclpy.spin_once(self)
                             current_minigrid_state = airsim2minigrid((self.n_airsim, self.e_airsim, 0))
-                            print("Current Minigrid State: {}, Final State: {}".format(current_minigrid_state, final_minigrid_state))   
+                            #print("Current Minigrid State: {}, Final State: {}".format(current_minigrid_state, final_minigrid_state))   
                         self.get_logger().info('Reached Target Cell...')
                         
                         if car.id in self.detected_entity_ids:
@@ -589,20 +626,20 @@ class MinimalPublisher(Node):
         # waypoint_msg.drive_train_type = "ForwardOnly"
         waypoint_msg.wait_on_last_task = False
 
-        self.publisher_.publish(waypoint_msg)
+        self.waypoint_publisher.publish(waypoint_msg)
         self.get_logger().info('Publishing Waypoints...')
 
 def main(args=None):
     rclpy.init(args=args)
 
-    minimal_publisher = MinimalPublisher()
+    mission_exec = Mission_Exec()
 
-    rclpy.spin(minimal_publisher)
+    rclpy.spin(mission_exec)
 
     # Destroy the node explicitly
     # (optional - otherwise it will be done automatically
     # when the garbage collector destroys the node object)
-    minimal_publisher.destroy_node()
+    mission_exec.destroy_node()
     rclpy.shutdown()
 
 
