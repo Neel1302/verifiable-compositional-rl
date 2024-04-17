@@ -78,7 +78,7 @@ class Mission_Exec(Node):
         self.visited_cell_idxs = [] # Keeps track of visited cells
 
         # Load mission files
-        self.mission = Mission(os.path.join(base_path, 'mission_briefing/description.json'), os.path.join(base_path, 'mission_briefing/config.json'))
+        self.mission = Mission('/mission_briefing/description.json', '/mission_briefing/config.json')
 
         # Wait for the first ROS position message to arrive 
         while self.odom_msg == None:
