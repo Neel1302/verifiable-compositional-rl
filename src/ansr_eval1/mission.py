@@ -143,83 +143,90 @@ class Mission:
 
         self.start_airsim_state = self.config_data["controllable_vehicle_start_loc"]
 
-        for area in self.description_data["scenario_objective"]["areas_of_interest"]:
-            for polygon in area["polygon_vertices"]:
-                enu_points = []
-                for point in polygon:
-                    enu_point = point[::-1]
-                    enu_points.append(enu_point)
-                poly = Polygon(enu_points)
-                self.AOI_list.append(poly)
-
-
-        for entity in self.description_data["scenario_objective"]["entities_of_interest"]:
-            id = entity["entity_id"]
-            priority = entity["priority"]
-            car = Car(id, priority)
-
-            region_list = []
-            total_prob = 0
-            for area in entity["entity_priors"]["location_belief_map"]:
+        if "areas_of_interest" in self.description_data["scenario_objective"]:
+            for area in self.description_data["scenario_objective"]["areas_of_interest"]:
                 for polygon in area["polygon_vertices"]:
                     enu_points = []
                     for point in polygon:
                         enu_point = point[::-1]
                         enu_points.append(enu_point)
                     poly = Polygon(enu_points)
-                    prob = area["probability"]
-                    total_prob = total_prob + prob
-                    region = Region(prob, poly)
-                    region_list.append(region)
-            # AOI
-            if total_prob < 1:
-                for AOI in self.AOI_list:
-                    diff = AOI
-                    for region in region_list:
-                        diff = diff - region.polygon
-                    region = Region(1-total_prob, diff)
-                    region_list.append(region)
-
-            region_list.sort(reverse=True, key=polygonSortCriterion)
-            car.map = region_list
-            self.car_list.append(car)
-
-        self.car_list.sort(key=carSortCriterion)
-
-        for keep_out_zone in self.description_data["scenario_constraints"]["spatial_constraints"]["keep_out_zones"]:
-            enu_points = []
-            for point in  keep_out_zone["keep_out_polygon_vertices"]:
-                enu_point = point[::-1]
-                enu_points.append(enu_point)
-            poly = Polygon(enu_points)
-            t_start = keep_out_zone["no_earlier_than"]
-            t_end = keep_out_zone["no_later_than"]
-            zone = Zone(poly, t_start, t_end)
-            cells = cellsInKeepOutZone(self.cells, zone)
-            zone.cells = cells
-            self.keep_out_zones.append(zone)
+                    self.AOI_list.append(poly)
 
 
-        for route_data in self.description_data["scenario_objective"]["routes_of_interest"]:
-            points_list = []
-            for route_points in route_data["route_points"]:
-                enu_points = []
-                for point in route_points:
-                    enu_point = point[::-1]
-                    enu_points.append(enu_point)
-                points_list.append(enu_points)
+        if "entities_of_interest" in self.description_data["scenario_objective"]:
+            for entity in self.description_data["scenario_objective"]["entities_of_interest"]:
+                id = entity["entity_id"]
+                priority = entity["priority"]
+                car = Car(id, priority)
 
-            rectangles = []
-            for rectangle in route_data["enclosing_rectangles"]:
-                enu_points = []
-                for point in rectangle:
-                    enu_point = point[::-1]
-                    enu_points.append(enu_point)
-                rect = Polygon(enu_points)
-                rectangles.append(rect)
+                region_list = []
+                total_prob = 0
+                if "entity_priors" in entity:
+                    if "location_belief_map" in entity["entity_priors"]:
+                        for area in entity["entity_priors"]["location_belief_map"]:
+                            for polygon in area["polygon_vertices"]:
+                                enu_points = []
+                                for point in polygon:
+                                    enu_point = point[::-1]
+                                    enu_points.append(enu_point)
+                                poly = Polygon(enu_points)
+                                prob = area["probability"]
+                                total_prob = total_prob + prob
+                                region = Region(prob, poly)
+                                region_list.append(region)
+                        # AOI
+                        if total_prob < 1:
+                            for AOI in self.AOI_list:
+                                diff = AOI
+                                for region in region_list:
+                                    diff = diff - region.polygon
+                                region = Region(1-total_prob, diff)
+                                region_list.append(region)
 
-            route = Route(points_list, rectangles)
-            self.route_list.append(route)
+                        region_list.sort(reverse=True, key=polygonSortCriterion)
+                        car.map = region_list
+                self.car_list.append(car)
+
+            self.car_list.sort(key=carSortCriterion)
+
+        if "spatial_constraints" in self.description_data["scenario_constraints"]:
+            if "keep_out_zones" in self.description_data["scenario_constraints"]["spatial_constraints"]:
+                for keep_out_zone in self.description_data["scenario_constraints"]["spatial_constraints"]["keep_out_zones"]:
+                    enu_points = []
+                    for point in  keep_out_zone["keep_out_polygon_vertices"]:
+                        enu_point = point[::-1]
+                        enu_points.append(enu_point)
+                    poly = Polygon(enu_points)
+                    t_start = keep_out_zone["no_earlier_than"]
+                    t_end = keep_out_zone["no_later_than"]
+                    zone = Zone(poly, t_start, t_end)
+                    cells = cellsInKeepOutZone(self.cells, zone)
+                    zone.cells = cells
+                    self.keep_out_zones.append(zone)
+
+
+        if "routes_of_interest" in self.description_data["scenario_objective"]:
+            for route_data in self.description_data["scenario_objective"]["routes_of_interest"]:
+                points_list = []
+                for route_points in route_data["route_points"]:
+                    enu_points = []
+                    for point in route_points:
+                        enu_point = point[::-1]
+                        enu_points.append(enu_point)
+                    points_list.append(enu_points)
+
+                rectangles = []
+                for rectangle in route_data["enclosing_rectangles"]:
+                    enu_points = []
+                    for point in rectangle:
+                        enu_point = point[::-1]
+                        enu_points.append(enu_point)
+                    rect = Polygon(enu_points)
+                    rectangles.append(rect)
+    
+                route = Route(points_list, rectangles)
+                self.route_list.append(route)
 
         # Postprocessing
         for car in self.car_list:
@@ -346,7 +353,7 @@ class Mission:
 
 if __name__ == "__main__":
         mission = Mission('../../../mission-schema/examples/Maneuver/RouteSearch/RSM002/description.json', '../../../mission-schema/examples/Maneuver/RouteSearch/RSM002/config.json') 
-        # mission = Mission('../../../mission-schema/examples/Maneuver/AreaSearch/ASM004/description.json', '../../../mission-schema/examples/Maneuver/AreaSearch/ASM004/config.json') 
+        #mission = Mission('../../../mission-schema/examples/Maneuver/AreaSearch/ASM004/description3.json', '../../../mission-schema/examples/Maneuver/AreaSearch/ASM004/config.json') 
 
         for area in mission.AOI_list:
             print('AOI ', area)
