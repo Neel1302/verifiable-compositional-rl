@@ -434,6 +434,8 @@ class Graph:
                     # for each controller/cell find its length
                     cell = self.mission.cells[c//2]
                     cell_length = self.edges[c].manhattan_distance()
+                    if cell.in_keep_out_zone:
+                        distance += cell_length*3
                     if cell.visited: # previously visited cell
                         distance += cell_length
                     elif not cell.in_any_region: # not visited cell but not in region of interest

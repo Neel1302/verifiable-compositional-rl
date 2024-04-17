@@ -74,8 +74,9 @@ class Mission_Exec(Node):
         self.create_subscription(TargetPerception, 'adk_node/ground_truth/perception', self.gt_perception_callback, 10) # Ground truth perception topic
         self.create_subscription(Odometry, 'adk_node/SimpleFlight/odom_local_ned', self.odom_callback, 10) # Position topic (NED frame)
         self.odom_msg = None
-        self.detected_entity_ids = [] # Keeps track of detected EOIs
-        self.visited_cell_idxs = [] # Keeps track of visited cells
+        self.detected_entity_ids = set() # Keeps track of detected EOIs
+        self.visited_cell_idxs = set() # Keeps track of visited cells
+        self.partly_visited_cell_idxs = set()
 
         # Load mission files
         self.mission = Mission('/mission_briefing/description.json', '/mission_briefing/config.json')
@@ -94,7 +95,8 @@ class Mission_Exec(Node):
             self.run_area_search_mission()
             if not self.all_cars_detected():
                 self.run_special_aoi_search()
-            # self.run_special_aoi_search()
+            if not self.all_cars_detected():
+                self.run_partly_visited_cell_search()
             self.get_logger().info("\n\n\n")
             self.get_logger().info('Area Search Mission Ended...')
             self.sim_termination_publisher.publish(Empty())
@@ -106,6 +108,34 @@ class Mission_Exec(Node):
             self.get_logger().info('Route Search Mission Ended...')
             self.sim_termination_publisher.publish(Empty())
             exit()
+
+    def run_partly_visited_cell_search(self):
+        self.get_logger().info('Performing Partly Visited Cell Search...')
+        visited_cell_idxs = set()
+        for cell_idx in self.partly_visited_cell_idxs:
+            if cell_idx in visited_cell_idxs: continue
+            current_minigrid_state = airsim2minigrid((self.n_airsim, self.e_airsim, 0))
+            hl_controller_idx_list = self.mission.graph.find_controllers_from_node_to_edge(current_minigrid_state[0], current_minigrid_state[1], cell_idx, False, True)
+            hl_controller_idx_list = hl_controller_idx_list[0]
+            hl_controller_list = self.get_controller_list(hl_controller_idx_list)
+
+            if len(hl_controller_idx_list) != 0:
+                self.get_logger().info('Moving to Next Cell {}...'.format(cell_idx))
+                # Execute controllers in minigrid and publish waypoints
+                self.run_minigrid_solver_and_pub(hl_controller_list)
+                final_minigrid_state = list(hl_controller_list[-1].get_final_states()[0])
+                
+                # While moving to the waypoints keep track of detected entities
+                while (current_minigrid_state != final_minigrid_state):
+                    rclpy.spin_once(self)
+                    current_minigrid_state = airsim2minigrid((self.n_airsim, self.e_airsim, 0))
+                    #print("Current Minigrid State: {}, Final State: {}".format(current_minigrid_state, final_minigrid_state))   
+                for controller_idx in hl_controller_idx_list:
+                    visited_cell_idxs.add(controller_idx//2)
+                self.get_logger().info('Reached Target Cell {}...'.format(cell_idx))
+                if self.all_cars_detected():
+                    return
+
 
     def run_route_search_mission(self):
         self.get_logger().info("\n\n\n")
@@ -143,19 +173,26 @@ class Mission_Exec(Node):
 
     def run_special_aoi_search(self):
         self.get_logger().info('Performing Special AOI Search...')
-        AOI_points = self.mission.getSpecialAOIPoints()
+        minigrid_AOI_points = []
+        airsim_AOI_points = self.mission.getSpecialAOIPoints()
         current_state = [self.n_airsim, self.e_airsim, 0]
-        for point in AOI_points:
-            airsim_state_list = []
+        airsim_state_list = []
+        for point in airsim_AOI_points:
             AOI_point_entry = self.mission.getSpecialAOIPointEntry(point)
             if AOI_point_entry is None: continue
 
             airsim_state_entry = [AOI_point_entry[1], AOI_point_entry[0], 0]
             airsim_state_AOI = [point[1], point[0], 0]
 
-            state_list = self.get_navigation_state_list(current_state, airsim_state_entry)
-            airsim_state_list.extend(state_list)
+            self.get_logger().info("Current state and target state: "+str(current_state)+"\n"+str(airsim_state_entry))
 
+            minigrid_state_AOI = airsim2minigrid(airsim_state_AOI)
+            minigrid_AOI_points.append(minigrid_state_AOI)
+
+            if (current_state != airsim_state_entry):
+                state_list = self.get_navigation_state_list(current_state, airsim_state_entry)
+                airsim_state_list.extend(state_list)
+                self.get_logger().info("Airsim state list: "+str(airsim_state_list))
             airsim_state_list.append(airsim_state_AOI)
 
             state_list = self.look_around(airsim_state_AOI)
@@ -168,8 +205,24 @@ class Mission_Exec(Node):
             current_state = airsim_state_entry
 
         #print("AOI Waypoints: ", airsim_state_list)    
-        self.pub_waypoint(airsim_state_list)
+        self.pub_waypoint(airsim_state_list, 7.0)
 
+        self.get_logger().info("Airsim state list: "+str(airsim_state_list))
+        self.get_logger().info("Minigrid AOI points: "+str(minigrid_AOI_points))
+        
+        current_minigrid_state = airsim2minigrid((self.n_airsim, self.e_airsim, 0))
+        final_minigrid_state = airsim2minigrid(airsim_state_list[-1])
+
+        # While moving to the waypoints keep track of detected entities
+        while ((current_minigrid_state != final_minigrid_state) or (len(minigrid_AOI_points) > 0)):
+            rclpy.spin_once(self)
+            current_minigrid_state = airsim2minigrid((self.n_airsim, self.e_airsim, 0))
+            # print("Current Minigrid State: {}, Final State: {}".format(current_minigrid_state, final_minigrid_state))
+            self.get_logger().info("Current Minigrid State: {}, Final State: {}".format(current_minigrid_state, final_minigrid_state))
+            if current_minigrid_state in minigrid_AOI_points:
+                minigrid_AOI_points.remove(current_minigrid_state)
+                self.get_logger().info(str(minigrid_AOI_points))
+    
     def get_navigation_state_list(self, source_state, target_state):
         obs_list = []
         source_minigrid_state = airsim2minigrid(source_state)
@@ -239,7 +292,7 @@ class Mission_Exec(Node):
         entity_status = "entered" if gt_perception_msg.enter_or_leave == 0 else "left"
         entity_id = gt_perception_msg.entity_id
         self.get_logger().info('Entity {} just {} {} with probability {}...'.format(entity_id, entity_status, gt_perception_msg.camera, gt_perception_msg.probability))
-        if entity_id not in self.detected_entity_ids: self.detected_entity_ids.append(entity_id)
+        if entity_id not in self.detected_entity_ids: self.detected_entity_ids.add(entity_id)
 
     def odom_callback(self, odom_msg):
         self.odom_msg = odom_msg
@@ -355,7 +408,7 @@ class Mission_Exec(Node):
             self.mission.start_minigrid_state = airsim2minigrid(self.mission.start_airsim_state) # Get the airsim state for the entry state of the first controller
 
             # Move to entry state of the first controller
-            self.get_logger().info('Moving to Initial Entry Position...')
+            self.get_logger().info('Moving to Initial Entry Position {}...'.format(self.mission.start_airsim_state))
             self.pub_waypoint([self.mission.start_airsim_state])
 
             # Check if the drone reached entry state of the first controller
@@ -380,8 +433,8 @@ class Mission_Exec(Node):
     def run_area_search_mission(self):
         # Itereate through each car in the list of cars
         for car in self.mission.car_list:
-            print('Looking for car: ', car.id)
-            print('Priority: ', car.priority)
+            # print('Looking for car: ', car.id)
+            # print('Priority: ', car.priority)
             if car.id in self.detected_entity_ids: continue # Skip if we already detected the car
             self.run_single_eoi_search(car) # Planning for how to search for the car
 
@@ -473,7 +526,7 @@ class Mission_Exec(Node):
     def run_single_eoi_search(self, car):
         # Iterate through each region in AOI
         for region in car.map:
-            print('Probability: ',region.probability)
+            # print('Probability: ',region.probability)
             #print('Polygon: ', region.polygon)
             #print('Cells: ', region.cells)
             # Iterate through each cell that covers the region -> Plan how to get to one of the destination the cell states from current state
@@ -482,6 +535,7 @@ class Mission_Exec(Node):
                 
                 current_minigrid_state = airsim2minigrid((self.n_airsim, self.e_airsim, 0))
 
+                skip_KOZ_handling = False
                 # Obtain a list of controllers yielding shortest path to cell of interest that does not intersect with any KOZ
                 hl_controller_idx_list = self.mission.graph.find_controllers_from_node_to_edge(current_minigrid_state[0], current_minigrid_state[1], cell_idx, True, True)
                 #print("\nFind controllers from coord({}, {}) to cell {}".format(current_minigrid_state[0], current_minigrid_state[1], cell_idx))
@@ -490,15 +544,19 @@ class Mission_Exec(Node):
                 #    print(p)
                 #print("\n")
 
+                if len(hl_controller_idx_list) == 0: # If we have no path obtained, accept going through KOZ
+                    skip_KOZ_handling = True
+                    hl_controller_idx_list = self.mission.graph.find_controllers_from_node_to_edge(current_minigrid_state[0], current_minigrid_state[1], cell_idx, False, True)
+
+
                 # Move to a cell based on car priority and probability
                 # ------------------------------------------------------------------------------------------------
         
-                if len(hl_controller_idx_list) == 0: continue # Skip if we have no path obtained
                 hl_controller_idx_list = hl_controller_idx_list[0]
                 hl_controller_list = self.get_controller_list(hl_controller_idx_list)
                 
                 # Only go upto the penultimate cell if a KOZ is in the last cell
-                if self.mission.cells[cell_idx].in_keep_out_zone:
+                if self.mission.cells[cell_idx].in_keep_out_zone and not skip_KOZ_handling:
                     #print("Cell {} is in KOZ and controller list is: {}".format(cell_idx, hl_controller_idx_list))
                     target_controller_idx = hl_controller_idx_list[-1]
                     target_controller = hl_controller_list[-1]
@@ -509,12 +567,12 @@ class Mission_Exec(Node):
                 for controller_idx in hl_controller_idx_list:
                     cell_id = math.floor(controller_idx/2)
                     if cell_id not in self.visited_cell_idxs:
-                        self.visited_cell_idxs.append(cell_id)
+                        self.visited_cell_idxs.add(cell_id)
                         self.mission.cells[cell_id].visited = True
                 #print("Visited Cells:", self.visited_cell_idxs)
                 
                 if len(hl_controller_idx_list) != 0:
-                    self.get_logger().info('Moving to Next Cell...')
+                    self.get_logger().info('Moving to Next Cell {}...'.format(cell_idx))
                     # Execute controllers in minigrid and publish waypoints
                     self.run_minigrid_solver_and_pub(hl_controller_list)
                     final_minigrid_state = list(hl_controller_list[-1].get_final_states()[0])
@@ -524,7 +582,7 @@ class Mission_Exec(Node):
                         rclpy.spin_once(self)
                         current_minigrid_state = airsim2minigrid((self.n_airsim, self.e_airsim, 0))
                         #print("Current Minigrid State: {}, Final State: {}".format(current_minigrid_state, final_minigrid_state))   
-                    self.get_logger().info('Reached Target Cell...')
+                    self.get_logger().info('Reached Target Cell {}...'.format(cell_idx))
                     
                     if car.id in self.detected_entity_ids:
                         return
@@ -533,7 +591,7 @@ class Mission_Exec(Node):
                 # ------------------------------------------------------------------------------------------------
                 
                 # Once at entry to the target cell, check which controller has KOZ
-                if self.mission.cells[cell_idx].in_keep_out_zone:
+                if self.mission.cells[cell_idx].in_keep_out_zone and not skip_KOZ_handling:
                     ret = self.traverse_koz_and_return(cell_idx, car, target_controller, False)
                     if ret == True: return
 
@@ -552,14 +610,18 @@ class Mission_Exec(Node):
 
                     # Moving to the other end of KOZ
                     # ------------------------------------------------------------------------------------------------
-                    if len(hl_controller_idx_list) == 0: continue # Skip if we have no path obtained
+                    if len(hl_controller_idx_list) == 0:
+                        self.visited_cell_idxs.add(cell_idx)
+                        self.partly_visited_cell_idxs.add(cell_idx)
+                        continue # Skip if we have no path obtained
+                    
                     hl_controller_idx_list = hl_controller_idx_list[0]
                     hl_controller_list = self.get_controller_list(hl_controller_idx_list)
 
                     target_controller = hl_controller_list[-1]
 
                     if len(hl_controller_idx_list) != 0:
-                        self.get_logger().info('Moving to Next Cell...')
+                        self.get_logger().info('Moving to Next Cell {}...'.format(cell_idx))
                         # Execute controllers in minigrid and publish waypoints
                         self.run_minigrid_solver_and_pub(hl_controller_list)
                         final_minigrid_state = list(hl_controller_list[-1].get_final_states()[0])
@@ -569,7 +631,7 @@ class Mission_Exec(Node):
                             rclpy.spin_once(self)
                             current_minigrid_state = airsim2minigrid((self.n_airsim, self.e_airsim, 0))
                             #print("Current Minigrid State: {}, Final State: {}".format(current_minigrid_state, final_minigrid_state))   
-                        self.get_logger().info('Reached Target Cell...')
+                        self.get_logger().info('Reached Target Cell {}...'.format(cell_idx))
                         
                         if car.id in self.detected_entity_ids:
                             return
@@ -585,13 +647,13 @@ class Mission_Exec(Node):
                     else: self.get_logger().info('Could not find target car {}'.format(car.id))
 
                 
-    def pub_waypoint(self, obs_list):
+    def pub_waypoint(self, obs_list, velocity=15.0):
         waypoint_msg = WaypointPath()
         
         pose_msg_array = []
 
         for airsim_obs in obs_list:
-            z = -10.0
+            z = -15.0
             n_airsim, e_airsim, yaw_airsim = airsim_obs
 
             roll = 0
@@ -620,7 +682,7 @@ class Mission_Exec(Node):
             pose_msg_array.append(pose_msg)
 
         waypoint_msg.path = pose_msg_array
-        waypoint_msg.velocity = 7.0
+        waypoint_msg.velocity = velocity
         waypoint_msg.lookahead = -1.0
         waypoint_msg.adaptive_lookahead = 0.0
         # waypoint_msg.drive_train_type = "ForwardOnly"
