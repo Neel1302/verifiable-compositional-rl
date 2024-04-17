@@ -2,12 +2,12 @@
 # 2. Calculate all possible acylic paths in the graph for each pair of vertices and sort them by their manhattan distance.
 # 3. Repeat (2) but while avoiding keep out zones.
 
-from mission import Mission
+# from mission import Mission
 
-import sys
-import getpass
-sys.path.append('/home/{}/dev_ws/src/verifiable-compositional-rl/src/'.format(getpass.getuser()))
-from Controllers.minigrid_controller import MiniGridController
+# import sys
+# import getpass
+# sys.path.append('/home/{}/dev_ws/src/verifiable-compositional-rl/src/'.format(getpass.getuser()))
+# from Controllers.minigrid_controller import MiniGridController
 
 from collections import namedtuple
 
@@ -186,77 +186,77 @@ class Graph:
     def get_neighboring_nodes(self, node: str):
         return [n.get_node2().get_id() for n in self.id_to_edges[node]]
     
-    def set_data(self, mission: Mission, controllers: list[MiniGridController]):
-        """
-        Read graph from Mission object and list of controllers
-        and populate nodes, edges and keep_out_zone.
-        There are two controllers per cell:
-        Cell i corresponds to Controller 2i and 2i+1
-        """
-        # Mission defines cells (i.e. edges)
-        # Controllers are associated with initial and final states
+    # def set_data(self, mission: Mission, controllers: list[MiniGridController]):
+    #     """
+    #     Read graph from Mission object and list of controllers
+    #     and populate nodes, edges and keep_out_zone.
+    #     There are two controllers per cell:
+    #     Cell i corresponds to Controller 2i and 2i+1
+    #     """
+    #     # Mission defines cells (i.e. edges)
+    #     # Controllers are associated with initial and final states
 
-        self.mission = mission
-        self.controllers = controllers
+    #     self.mission = mission
+    #     self.controllers = controllers
         
-        # Get vertices either from initial states
-        initial_states = set()
-        final_states = set()
-        for controller in controllers:
-            init_state = controller.get_init_states()
-            fin_state = controller.get_final_states()
-            assert(len(init_state) == 1)
-            assert(len(fin_state) == 1)
-            p1 = Point(init_state[0][0], init_state[0][1])
-            p2 = Point(fin_state[0][0], fin_state[0][1])
-            initial_states.add(p1) 
-            final_states.add(p2)
+    #     # Get vertices either from initial states
+    #     initial_states = set()
+    #     final_states = set()
+    #     for controller in controllers:
+    #         init_state = controller.get_init_states()
+    #         fin_state = controller.get_final_states()
+    #         assert(len(init_state) == 1)
+    #         assert(len(fin_state) == 1)
+    #         p1 = Point(init_state[0][0], init_state[0][1])
+    #         p2 = Point(fin_state[0][0], fin_state[0][1])
+    #         initial_states.add(p1) 
+    #         final_states.add(p2)
 
-        # Populate nodes
-        self.n_nodes = len(initial_states)
-        for i, pt in enumerate(initial_states):
-            n = Node(str(i), pt)
-            self.nodes.append(n)
-            self.id_to_node[n.get_id()] = n
-            self.coord_to_node[n.get_point().x, n.get_point().y] = n
+    #     # Populate nodes
+    #     self.n_nodes = len(initial_states)
+    #     for i, pt in enumerate(initial_states):
+    #         n = Node(str(i), pt)
+    #         self.nodes.append(n)
+    #         self.id_to_node[n.get_id()] = n
+    #         self.coord_to_node[n.get_point().x, n.get_point().y] = n
 
-        # for key, value in self.id_to_node.items():
-        #     value.print()                    
-        # for key, value in self.coord_to_node.items():
-        #     # print(key, end=": ")
-        #     value.print()
+    #     # for key, value in self.id_to_node.items():
+    #     #     value.print()                    
+    #     # for key, value in self.coord_to_node.items():
+    #     #     # print(key, end=": ")
+    #     #     value.print()
         
-        # Populate edges
-        self.n_edges = len(controllers)
-        # print("\n\n# edges:", self.n_edges)
-        for i, controller in enumerate(controllers):
-            init_state = controller.get_init_states()
-            fin_state = controller.get_final_states()
-            assert(len(init_state) == 1)
-            assert(len(fin_state) == 1)
-            w, x = init_state[0][0], init_state[0][1]
-            y, z = fin_state[0][0], fin_state[0][1]
-            n1 = self.coord_to_node[w, x]
-            n2 = self.coord_to_node[y, z]
-            e = Edge(n1, n2)
-            # No need to generate reverse edge since its a separate controller
-            self.edges.append(e)
-            self.id_to_edges.setdefault(n1.get_id(), []).append(e)
-            self.coord_to_edge[w, x, y, z] = (e, i)
+    #     # Populate edges
+    #     self.n_edges = len(controllers)
+    #     # print("\n\n# edges:", self.n_edges)
+    #     for i, controller in enumerate(controllers):
+    #         init_state = controller.get_init_states()
+    #         fin_state = controller.get_final_states()
+    #         assert(len(init_state) == 1)
+    #         assert(len(fin_state) == 1)
+    #         w, x = init_state[0][0], init_state[0][1]
+    #         y, z = fin_state[0][0], fin_state[0][1]
+    #         n1 = self.coord_to_node[w, x]
+    #         n2 = self.coord_to_node[y, z]
+    #         e = Edge(n1, n2)
+    #         # No need to generate reverse edge since its a separate controller
+    #         self.edges.append(e)
+    #         self.id_to_edges.setdefault(n1.get_id(), []).append(e)
+    #         self.coord_to_edge[w, x, y, z] = (e, i)
         
-        # for i in range(self.n_edges):
-            # self.edges[i].print()
+    #     # for i in range(self.n_edges):
+    #         # self.edges[i].print()
 
-        # for k, v in self.coord_to_edge.items():
-            # print(f"{v[1]}: {k}, ", end="")
-            # v[0].print()
+    #     # for k, v in self.coord_to_edge.items():
+    #         # print(f"{v[1]}: {k}, ", end="")
+    #         # v[0].print()
 
-        # Determine keep out zones cells (i.e. edges)
-        self.keep_out_edges = []
-        assert(len(mission.cells) == self.n_edges/2)
-        for c in mission.cells:
-            self.keep_out_edges.append(c.in_keep_out_zone)
-            self.keep_out_edges.append(c.in_keep_out_zone)
+    #     # Determine keep out zones cells (i.e. edges)
+    #     self.keep_out_edges = []
+    #     assert(len(mission.cells) == self.n_edges/2)
+    #     for c in mission.cells:
+    #         self.keep_out_edges.append(c.in_keep_out_zone)
+    #         self.keep_out_edges.append(c.in_keep_out_zone)
 
     def initialize_from_file(self, file_name):
         """
@@ -551,7 +551,20 @@ class Graph:
         
         return self.nodes[nearest_node]
 
-
+    def nearest_controller_by_prob_dist(self, src_x: int, src_y: int, controllers: list[(int, float)]) -> int:
+        min_prob_dist = 0
+        min_index = -1
+        src = Point(src_x, src_y)
+        for (controller_id, controller_prob) in controllers:
+            edge = self.edges[controller_id]
+            n1, n2 = edge.get_node1(), edge.get_node2()
+            n1_dist, n2_dist = manhattan_distance(src, n1.get_point()), manhattan_distance(src, n2.get_point())
+            max_dist = max(n1_dist, n2_dist)
+            prob_dist = max_dist * (1/controller_prob)
+            print(f"{controller_id=}, {controller_prob=}, {max_dist=}, {prob_dist=}")
+            if min_index < 0 or prob_dist < min_prob_dist:
+                min_index, min_prob_dist = controller_id, prob_dist
+        return min_index
 
 if __name__ == "__main__":
     import sys
@@ -716,3 +729,6 @@ if __name__ == "__main__":
             for p in a_graph.find_controllers_from_node_to_node(12, 6, 2, 6, True, True):
                 print(p)
 
+            print("\n\nTest: Find next controller: src (12,6) controllers (4:0.2, 5:0.05, 6:0.15)")
+            next_controller = a_graph.nearest_controller_by_prob_dist(12, 6, [(4, 0.2), (5, 0.05), (6, 0.15)])
+            print(f"Next controller: {next_controller}")
