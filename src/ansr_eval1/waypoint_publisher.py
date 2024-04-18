@@ -69,7 +69,7 @@ class Mission_Exec(Node):
         super().__init__('waypoint_publisher')
         # ROS publishers and subscribers
         qos_profile = QoSProfile(depth=1,reliability=QoSReliabilityPolicy.RELIABLE,durability=QoSDurabilityPolicy.TRANSIENT_LOCAL) # Require special QOS for this message
-        self.waypoint_publisher = self.create_publisher(WaypointPath, 'adk_node/input/waypoints', qos_profile) # Waypoint topic for ROS2 API controller
+        self.waypoint_publisher = self.create_publisher(WaypointPath, 'adk_node/input/sparse_waypoints', qos_profile) # Waypoint topic for ROS2 API controller
         self.sim_termination_publisher = self.create_publisher(Empty, 'adk_node/input/terminate', qos_profile) # Waypoint topic for ROS2 API controller
         self.create_subscription(TargetPerception, 'adk_node/ground_truth/perception', self.gt_perception_callback, 10) # Ground truth perception topic
         self.create_subscription(Odometry, 'adk_node/SimpleFlight/odom_local_ned', self.odom_callback, 10) # Position topic (NED frame)
@@ -143,6 +143,7 @@ class Mission_Exec(Node):
         # self.get_logger().info("\n\n\n")
         airsim_waypoint_list = []
         waypoint_list = []
+        max_waypoint_list_len = 148
 
         # assume signle route
         interpolated_waypoint_list = self.mission.interpolate_route_waypoints(self.mission.route_list[0])
@@ -154,10 +155,15 @@ class Mission_Exec(Node):
         for waypoint in route_waypoint_list:
             airsim_waypoint_list.append([waypoint[1], waypoint[0], 0])
 
-        for i in range(100):
+        self.get_logger().info('Waypoint list len:'+str(airsim_waypoint_list))
+        max_iter = max_waypoint_list_len//len(airsim_waypoint_list)
+
+        self.get_logger().info('Max iterations:'+str(max_iter))
+        for i in range(max_iter):
             waypoint_list.extend(airsim_waypoint_list)
 
         self.pub_waypoint(waypoint_list)
+        self.get_logger().info('Length of waypoint list:'+str(len(waypoint_list)))
 
         while not self.all_cars_detected():
             rclpy.spin_once(self)
@@ -177,14 +183,18 @@ class Mission_Exec(Node):
         airsim_AOI_points = self.mission.getSpecialAOIPoints()
         current_state = [self.n_airsim, self.e_airsim, 0]
         airsim_state_list = []
+        shifted_points = ([64.0, 68.0], [-55.0, -64.0], [64.0, -60.0])
+        ideal_points = ([64.0, 64.0], [-64.0, -64.0], [64.0, -64.0])
+        if len(airsim_AOI_points) == 0: return
         for point in airsim_AOI_points:
-            AOI_point_entry = self.mission.getSpecialAOIPointEntry(point)
+            idx = shifted_points.index(point)
+            AOI_point_entry = self.mission.getSpecialAOIPointEntry(point, ideal_points[idx])
             if AOI_point_entry is None: continue
 
             airsim_state_entry = [AOI_point_entry[1], AOI_point_entry[0], 0]
             airsim_state_AOI = [point[1], point[0], 0]
 
-            self.get_logger().info("Current state and target state: "+str(current_state)+"\n"+str(airsim_state_entry))
+            # self.get_logger().info("Current state and target state: "+str(current_state)+"\n"+str(airsim_state_entry))
 
             minigrid_state_AOI = airsim2minigrid(airsim_state_AOI)
             minigrid_AOI_points.append(minigrid_state_AOI)
@@ -192,7 +202,7 @@ class Mission_Exec(Node):
             if (current_state != airsim_state_entry):
                 state_list = self.get_navigation_state_list(current_state, airsim_state_entry)
                 airsim_state_list.extend(state_list)
-                self.get_logger().info("Airsim state list: "+str(airsim_state_list))
+                # self.get_logger().info("Airsim state list: "+str(airsim_state_list))
             airsim_state_list.append(airsim_state_AOI)
 
             state_list = self.look_around(airsim_state_AOI)
@@ -207,8 +217,8 @@ class Mission_Exec(Node):
         #print("AOI Waypoints: ", airsim_state_list)    
         self.pub_waypoint(airsim_state_list, 7.0)
 
-        self.get_logger().info("Airsim state list: "+str(airsim_state_list))
-        self.get_logger().info("Minigrid AOI points: "+str(minigrid_AOI_points))
+        # self.get_logger().info("Airsim state list: "+str(airsim_state_list))
+        # self.get_logger().info("Minigrid AOI points: "+str(minigrid_AOI_points))
         
         current_minigrid_state = airsim2minigrid((self.n_airsim, self.e_airsim, 0))
         final_minigrid_state = airsim2minigrid(airsim_state_list[-1])
@@ -218,15 +228,15 @@ class Mission_Exec(Node):
             rclpy.spin_once(self)
             current_minigrid_state = airsim2minigrid((self.n_airsim, self.e_airsim, 0))
             # print("Current Minigrid State: {}, Final State: {}".format(current_minigrid_state, final_minigrid_state))
-            self.get_logger().info("Current Minigrid State: {}, Final State: {}".format(current_minigrid_state, final_minigrid_state))
+            # self.get_logger().info("Current Minigrid State: {}, Final State: {}".format(current_minigrid_state, final_minigrid_state))
             if current_minigrid_state in minigrid_AOI_points:
                 minigrid_AOI_points.remove(current_minigrid_state)
-                self.get_logger().info(str(minigrid_AOI_points))
     
     def get_navigation_state_list(self, source_state, target_state):
         obs_list = []
         source_minigrid_state = airsim2minigrid(source_state)
         target_minigrid_state = airsim2minigrid(target_state)
+        
         # Obtain a list of controllers yielding shortest path to cell of interest that does not intersect with any KOZ
         hl_controller_idx_list = self.mission.graph.find_controllers_from_node_to_node(source_minigrid_state[0], source_minigrid_state[1], target_minigrid_state[0], target_minigrid_state[1], True, True)
         #print("\nFind controllers from coord({}, {}) to coord({}, {})".format(source_minigrid_state[0], source_minigrid_state[1], target_minigrid_state[0], target_minigrid_state[1]))
@@ -409,7 +419,7 @@ class Mission_Exec(Node):
 
             # Move to entry state of the first controller
             self.get_logger().info('Moving to Initial Entry Position {}...'.format(self.mission.start_airsim_state))
-            self.pub_waypoint([self.mission.start_airsim_state])
+            self.pub_waypoint([[self.n_airsim, self.e_airsim, 0], self.mission.start_airsim_state])
 
             # Check if the drone reached entry state of the first controller
             current_minigrid_state = airsim2minigrid((self.n_airsim, self.e_airsim, 0))
@@ -647,7 +657,7 @@ class Mission_Exec(Node):
                     else: self.get_logger().info('Could not find target car {}'.format(car.id))
 
                 
-    def pub_waypoint(self, obs_list, velocity=15.0):
+    def pub_waypoint(self, obs_list, velocity=10.0):
         waypoint_msg = WaypointPath()
         
         pose_msg_array = []
@@ -670,9 +680,9 @@ class Mission_Exec(Node):
 
             pose_msg.header = h
             pose_msg.header.frame_id = "world_ned"
-            pose_msg.pose.position.x = n_airsim
-            pose_msg.pose.position.y = e_airsim
-            pose_msg.pose.position.z = z
+            pose_msg.pose.position.x = float(n_airsim)
+            pose_msg.pose.position.y = float(e_airsim)
+            pose_msg.pose.position.z = float(z)
 
             pose_msg.pose.orientation.x = q[0]
             pose_msg.pose.orientation.y = q[1]

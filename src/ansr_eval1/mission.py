@@ -252,7 +252,7 @@ class Mission:
 
 
     def getSpecialAOIPoints(self):
-        points = ([64.0, 64.0], [-64.0, -64.0], [64.0, -64.0])
+        points = ([64.0, 68.0], [-55.0, -64.0], [64.0, -60.0])
         AOI_points = []
         for car in self.car_list:
             for region in car.map:
@@ -265,9 +265,9 @@ class Mission:
         return AOI_points
 
 
-    def getSpecialAOIPointEntry(self, AOI_point):
-        x = AOI_point[0]
-        y = AOI_point[1]
+    def getSpecialAOIPointEntry(self, AOI_point, ideal_point):
+        x = ideal_point[0]
+        y = ideal_point[1]
         dx_array = [64, -64]
         dy_array = [64, -64]
         points = []
@@ -325,7 +325,7 @@ class Mission:
         route_waypoint_list = []
         head_list = []
         for waypoint in route_point_list:
-            print(waypoint)
+            # print(waypoint)
             if  waypoint != route_entry:
                 head_list.append(waypoint)
             else:
@@ -341,8 +341,8 @@ class Mission:
         tail_list_reverse = tail_list[:]
         tail_list_reverse.reverse()
 
-        head_list.pop(0)
-        tail_list_reverse.pop(0)
+        if len(head_list) != 0: head_list.pop(0)
+        if len(tail_list_reverse) != 0: tail_list_reverse.pop(0)
 
         route_waypoint_list.extend(tail_list)
         route_waypoint_list.extend(tail_list_reverse)
