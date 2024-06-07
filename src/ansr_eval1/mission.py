@@ -356,14 +356,6 @@ if __name__ == "__main__":
         # mission = Mission('../../../mission-schema/examples/Maneuver/AreaSearch/ASM004/description.json', '../../../mission-schema/examples/Maneuver/AreaSearch/ASM004/config.json') 
         mission = Mission('../../../adk/mission_briefing/description.json', '../../../adk/mission_briefing/config.json') 
 
-        
-        plt.plot(mission.start_airsim_state[1],mission.start_airsim_state[0], 'r*', markersize=10)
-
-        for area in mission.AOI_list:
-            print('AOI ', area)
-            x,y = area.exterior.xy
-            plt.plot(x,y, 'purple')
-
         for car in mission.car_list:
             print(car.id)
             print('priority: ', car.priority)
@@ -372,14 +364,19 @@ if __name__ == "__main__":
                 print(region.polygon)
                 print('cells: ', region.cells)
                 x,y = region.polygon.exterior.xy
-                plt.plot(x,y, 'yellow')
+                plt.plot(x,y, 'green')
+    
+        for area in mission.AOI_list:
+            print('AOI ', area)
+            x,y = area.exterior.xy
+            plt.plot(x,y, 'purple')
 
         for zone in mission.keep_out_zones:
             print('Keep Out Zone', zone.polygon)
             print("t_start \t", zone.t_start)
             print("t_end \t\t", zone.t_end)
             x,y = zone.polygon.exterior.xy
-            plt.plot(x,y, 'blue')
+            plt.plot(x,y, 'red')
 
         cell_idx = 0
         for cell in mission.cells:
@@ -398,6 +395,9 @@ if __name__ == "__main__":
             for rect in route.rectangles:
                 x,y = rect.exterior.xy
                 #plt.plot(x,y)
+    
+        plt.plot(mission.start_airsim_state[1],mission.start_airsim_state[0], 'r*', markersize=10)
+
 
         plt.show()
 

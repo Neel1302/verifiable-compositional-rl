@@ -74,6 +74,7 @@ class Mission_Exec(Node):
         self.create_subscription(TargetPerception, 'adk_node/ground_truth/perception', self.gt_perception_callback, 10) # Ground truth perception topic
         self.create_subscription(Odometry, 'adk_node/SimpleFlight/odom_local_ned', self.odom_callback, 10) # Position topic (NED frame)
         self.odom_msg = None
+        print("hello!1")
         self.detected_entity_ids = set() # Keeps track of detected EOIs
         self.visited_cell_idxs = set() # Keeps track of visited cells
         self.partly_visited_cell_idxs = set()
@@ -99,15 +100,15 @@ class Mission_Exec(Node):
                 self.run_partly_visited_cell_search()
             self.get_logger().info("\n\n\n")
             self.get_logger().info('Area Search Mission Ended...')
-            self.sim_termination_publisher.publish(Empty())
-            exit()
+            # self.sim_termination_publisher.publish(Empty()) # Disable when recoding video
+            # exit() # Disable when recoding video
 
         elif self.mission.mission_class == "Route Search":
             self.run_route_search_mission()
             self.get_logger().info("\n\n\n")
             self.get_logger().info('Route Search Mission Ended...')
-            self.sim_termination_publisher.publish(Empty())
-            exit()
+            # self.sim_termination_publisher.publish(Empty()) # Disable when recoding video
+            # exit() # Disable when recoding video
 
     def run_partly_visited_cell_search(self):
         self.get_logger().info('Performing Partly Visited Cell Search...')
@@ -155,7 +156,7 @@ class Mission_Exec(Node):
         for waypoint in route_waypoint_list:
             airsim_waypoint_list.append([waypoint[1], waypoint[0], 0])
 
-        self.get_logger().info('Waypoint list len:'+str(airsim_waypoint_list))
+        # self.get_logger().info('Waypoint list len:'+str(airsim_waypoint_list))
         max_iter = max_waypoint_list_len//len(airsim_waypoint_list)
 
         self.get_logger().info('Max iterations:'+str(max_iter))
@@ -163,7 +164,7 @@ class Mission_Exec(Node):
             waypoint_list.extend(airsim_waypoint_list)
 
         self.pub_waypoint(waypoint_list)
-        self.get_logger().info('Length of waypoint list:'+str(len(waypoint_list)))
+        # self.get_logger().info('Length of waypoint list:'+str(len(waypoint_list)))
 
         while not self.all_cars_detected():
             rclpy.spin_once(self)
@@ -326,8 +327,7 @@ class Mission_Exec(Node):
             node_airsim = [e, n]
             node_list.append(node_airsim)
         
-        # print("source_point:", source_point)
-        # print("node_list:", node_list)
+        self.get_logger().info("source_point:"+str(source_point))
 
         sorted_node_list = self.sort_points_by_distance(node_list, source_point)
 
@@ -345,7 +345,8 @@ class Mission_Exec(Node):
                     points.pop()
                 else:
                     e, n = node
-                    #print("Nearest AirSim Entry State: ", [n, e, 0])
+                    self.get_logger().info("Nearest AirSim Entry State: "+str([n, e, 0]))
+                    # print("Nearest AirSim Entry State: ", [n, e, 0])
                     return [n, e, 0]
         return None
 
@@ -414,6 +415,7 @@ class Mission_Exec(Node):
 
             # Get the nearest minigrid entry state of the first controller
             current_airsim_state = [self.n_airsim, self.e_airsim, 0]
+            self.get_logger().info(str(current_airsim_state))
             self.mission.start_airsim_state = self.get_nearest_entry(current_airsim_state)
             self.mission.start_minigrid_state = airsim2minigrid(self.mission.start_airsim_state) # Get the airsim state for the entry state of the first controller
 
@@ -475,6 +477,7 @@ class Mission_Exec(Node):
                 airsim_obs = minigrid2airsim(self.obs)
                 # print("AirSim State: "+str(airsim_obs)+"\n")
                 obs_list.append(airsim_obs)
+        # self.get_logger().info(str(obs_list))
         self.pub_waypoint(obs_list)
 
     def traverse_koz_and_return(self, cell_idx, car, target_controller, done_one_end):
@@ -591,7 +594,7 @@ class Mission_Exec(Node):
                     while (current_minigrid_state != final_minigrid_state):
                         rclpy.spin_once(self)
                         current_minigrid_state = airsim2minigrid((self.n_airsim, self.e_airsim, 0))
-                        #print("Current Minigrid State: {}, Final State: {}".format(current_minigrid_state, final_minigrid_state))   
+                        # print("Current Minigrid State: {}, Final State: {}".format(current_minigrid_state, final_minigrid_state))   
                     self.get_logger().info('Reached Target Cell {}...'.format(cell_idx))
                     
                     if car.id in self.detected_entity_ids:
