@@ -132,4 +132,4 @@ dmypy.json
 # Ignore tex output files
 *.tex
 
-src/data/*
+# src/data/*
